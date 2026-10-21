@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -49,6 +50,8 @@ class NavJobs:
         self.details: dict[str, tuple[Any, Document]] = {}
         self.by_org: dict[str, list[str]] = {}
         self.lock = threading.Lock()
+        self.max_seconds = 200
+        self.partial = False
 
     # -- feed --------------------------------------------------------------------------------
     def _headers(self) -> dict[str, str]:
@@ -67,7 +70,12 @@ class NavJobs:
         url = FEED_URL
         headers = {**self._headers(), "If-Modified-Since": format_datetime(since, usegmt=True)}
         pages = 0
+        started = time.monotonic()
         while url and pages < self.max_pages:
+            if time.monotonic() - started > self.max_seconds:
+                self.error = f"feed loading stopped after {self.max_seconds}s ({pages} pages); older active ads may be missing"
+                self.partial = True
+                break
             result = self.fetcher.get(url, accept="application/json", headers=headers, retries=2, snapshot=False, timeout=60,
                                       max_bytes=8_000_000)
             if not result.ok:

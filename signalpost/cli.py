@@ -195,7 +195,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     history_dir.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out, history_dir / f"{run_id}.jsonl")
     report = build_report(envelopes, agent, args, started, inputs)
-    report["previous_envelopes"] = str(previous_path) if previous_path else None
+    report["previous_envelopes"] = Path(previous_path).name if previous_path else None
     report_path = Path(args.report) if args.report else out.with_name("run-report.json")
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if not args.no_site:

@@ -204,12 +204,19 @@ def build_summary(ledger: Ledger, ctx: dict[str, Any]) -> dict[str, Any]:
     members = [r for r in roles if r.get("role_code") == "MEDL"]
     lead = []
     ids = []
-    if ceo:
-        lead.append(f"the chief executive is {ceo['value'] if isinstance(ceo['value'], str) else ceo['value']['name']}")
-        ids.append(ceo["id"])
-    if chair:
-        lead.append(f"the board is chaired by {chair['value'] if isinstance(chair['value'], str) else chair['value']['name']}")
-        ids.append(chair["id"])
+    def who(claim: dict[str, Any]) -> str:
+        return claim["value"] if isinstance(claim["value"], str) else claim["value"]["name"]
+
+    if ceo and chair and who(ceo) == who(chair):
+        lead.append(f"{who(ceo)} is both chief executive and chair of the board")
+        ids += [ceo["id"], chair["id"]]
+    else:
+        if ceo:
+            lead.append(f"the chief executive is {who(ceo)}")
+            ids.append(ceo["id"])
+        if chair:
+            lead.append(f"the board is chaired by {who(chair)}")
+            ids.append(chair["id"])
     if members:
         lead.append(f"{len(members)} further board member{'s' if len(members) != 1 else ''} {'are' if len(members) != 1 else 'is'} registered")
         ids.extend(m["id"] for m in members)

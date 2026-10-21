@@ -1,0 +1,128 @@
+{
+  "run_id": "smoke-2026-10-21-b",
+  "agent_version": "1.0.0",
+  "started_at": "2026-10-21T17:20:23Z",
+  "completed_at": "2026-10-21T17:21:35Z",
+  "wall_clock_seconds": 72.4,
+  "inputs": 100,
+  "emitted_envelopes": 100,
+  "status_counts": {
+    "available": 100
+  },
+  "section_states": {
+    "identity": {
+      "available": 100
+    },
+    "accounts": {
+      "available": 100
+    },
+    "people": {
+      "available": 100
+    },
+    "website": {
+      "available": 8,
+      "not_available": 89,
+      "blocked": 2,
+      "ambiguous": 1
+    },
+    "hiring": {
+      "not_available": 99,
+      "available": 1
+    },
+    "activity": {
+      "available": 100
+    }
+  },
+  "coverage": {
+    "annual_accounts": {
+      "companies": 76,
+      "company_share": 0.76,
+      "claims": 201
+    },
+    "brand": {
+      "companies": 4,
+      "company_share": 0.04,
+      "claims": 4
+    },
+    "company_profiles": {
+      "companies": 3,
+      "company_share": 0.03,
+      "claims": 5
+    },
+    "dated_activity": {
+      "companies": 0,
+      "company_share": 0.0,
+      "claims": 0
+    },
+    "description": {
+      "companies": 4,
+      "company_share": 0.04,
+      "claims": 4
+    },
+    "identity": {
+      "companies": 100,
+      "company_share": 1.0,
+      "claims": 100
+    },
+    "jobs": {
+      "companies": 1,
+      "company_share": 0.01,
+      "claims": 1
+    },
+    "leadership": {
+      "companies": 100,
+      "company_share": 1.0,
+      "claims": 383
+    },
+    "website": {
+      "companies": 8,
+      "company_share": 0.08,
+      "claims": 8
+    },
+    "workplaces": {
+      "companies": 74,
+      "company_share": 0.74,
+      "claims": 77
+    }
+  },
+  "operations": {
+    "requests": 738,
+    "bytes": 102412973,
+    "p50_request_ms": 1015,
+    "p95_request_ms": 2733,
+    "p50_company_ms": 6828,
+    "p95_company_ms": 11984,
+    "third_party_cost_usd": 0.0,
+    "search_provider": null,
+    "search_calls": 0,
+    "nav_feed": {
+      "state": "available",
+      "pages": 182,
+      "active_ads": 9775,
+      "matched_companies": 0,
+      "error": null
+    },
+    "top_hosts": {
+      "data.brreg.no": 411,
+      "pam-stilling-feed.nav.no": 183,
+      "devoldsregnskap.no": 6,
+      "7-eleven.no": 6,
+      "supermercado.no": 5,
+      "svorka.no": 5,
+      "www.aiota.no": 5,
+      "atg.no": 5
+    }
+  },
+  "validation": {
+    "passed": true,
+    "checks": {
+      "exact_expected_count": true,
+      "one_envelope_per_input": true,
+      "unique_organisation_numbers": true,
+      "all_states_terminal": true,
+      "every_claim_has_evidence": true,
+      "every_evidence_has_source_time_hash": true
+    }
+  },
+  "previous_envelopes": "envelopes.jsonl"
+}

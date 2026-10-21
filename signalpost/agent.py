@@ -48,6 +48,7 @@ class Work:
     posts: list[dict[str, Any]] = field(default_factory=list)
     requests_before: int = 0
     search_cost: float = 0.0
+    bulk_row: dict[str, Any] | None = None
 
 
 class Agent:
@@ -77,6 +78,7 @@ class Agent:
     # -- phase A: official registers --------------------------------------------------------------
     def official(self, work: Work, bulk_row: dict[str, Any] | None) -> None:
         org, ledger = work.org, work.ledger
+        work.bulk_row = bulk_row
         if self.remaining() < 15:
             work.errors.append({"section": "identity", "error": "time budget exhausted before this company was researched"})
             for section in ("identity", "accounts", "people"):
@@ -151,6 +153,8 @@ class Agent:
             return None
 
         add(entity.get("hjemmeside"), "registry_website", "strong")
+        bulk = work.bulk_row or {}
+        add(bulk.get("website") or (bulk.get("raw") or {}).get("hjemmeside"), "registry_snapshot_website", "strong")
         add(email_domain(entity.get("epostadresse")), "registry_email_domain", "medium", entity.get("epostadresse") or "")
         for homepage in self.nav.homepages(work.org):
             add(homepage, "nav_job_ad_employer_homepage", "medium")
@@ -277,7 +281,8 @@ class Agent:
             work.states["hiring"] = "available"
         elif self.nav.state == "available":
             work.states["hiring"] = "not_available"
-            work.notes["hiring"] = "no active ad with this organisation number (or its workplaces) in NAV's job feed"
+            partial = " (feed only partially loaded within the time budget)" if self.nav.partial else ""
+            work.notes["hiring"] = "no active ad with this organisation number (or its workplaces) in NAV's job feed" + partial
         else:
             work.states["hiring"] = "failed"
             work.notes["hiring"] = f"NAV job feed unavailable: {self.nav.error}"
@@ -304,7 +309,7 @@ class Agent:
         nav_thread.start()
         self.log(f"[phase A] official registers for {len(orgs)} companies")
         self._parallel(orgs, lambda org: self.official(works[org], (bulk or {}).get(org)), "official")
-        nav_thread.join(timeout=max(5, self.remaining() - 600))
+        nav_thread.join(timeout=max(5, min(260, self.remaining() - 120)))
         if self.nav.state == "available":
             names = {}
             for org, work in works.items():
