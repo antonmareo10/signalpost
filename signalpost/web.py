@@ -375,7 +375,8 @@ class SiteResearcher:
                 owner = item.get("overordnetEnhet") or item.get("organisasjonsnummer")
                 if owner == company.org or item.get("organisasjonsnummer") == company.org:
                     continue
-                if core <= set(name_tokens(item.get("navn") or "")):
+                other = name_tokens(item.get("navn") or "")
+                if core <= set(other) or "".join(company.core) in "".join(other):
                     unique = False
                     break
             if not unique:
@@ -422,11 +423,15 @@ class SiteResearcher:
             if proof["name_anywhere"] and contact and domain_name:
                 return "verified", 0.93, "legal name, registered contact detail and matching domain"
             return "rejected", 0.4, "insufficient exact-entity evidence"
+        # Discovered (guessed/searched) domains must also *be named after* the company: directories and
+        # aggregators print a company's name and phone number too, but on their own domain.
+        if not domain_name:
+            return "rejected", 0.3, "discovered domain is not named after the company (directory/aggregator risk)"
         if proof["name_identity"] and contact:
-            return "verified", 0.94, "legal name on the site plus registered contact detail"
-        if exact_name and (domain_name or contact) and (final_host.endswith(".no") or domain_name):
-            return "verified", 0.94, "the full registered legal name (unique in Norway) is printed on a matching site"
-        if proof["name_identity"] and domain_name and proof.get("name_unique_in_register") and proof.get("norwegian_context"):
+            return "verified", 0.95, "legal name and a registered contact detail on a site named after the company"
+        if exact_name:
+            return "verified", 0.94, "the full registered legal name (unique in Norway) is printed on a site named after the company"
+        if proof["name_identity"] and proof.get("name_unique_in_register") and proof.get("norwegian_context"):
             return "verified", 0.92, "on-site name and domain match the legal name, and no other registered entity carries that name"
         return "rejected", 0.3, "insufficient exact-entity evidence for a discovered domain"
 
@@ -550,19 +555,43 @@ def normalize_social(url: str) -> tuple[str, str] | None:
     return None
 
 
+OPAQUE_HANDLE = re.compile(r"(profile\.php\?id=\d+|/channel/uc[\w-]{10,}|/company/\d+|/pages/[^/]+/\d+|/p/[^/]*\d{6,})", re.I)
+
+
+def _initials(text: str) -> str:
+    words = [w for w in re.split(r"[^a-z0-9]+|(?<=[a-z])(?=[A-Z])", text) if w]
+    return "".join(w[0] for w in words).lower() if len(words) >= 2 else ""
+
+
 def handle_matches(company: Company, url: str, brand: str | None, site_host: str) -> bool:
-    path = fold(urllib.parse.unquote(urllib.parse.urlsplit(url).path + "?" + urllib.parse.urlsplit(url).query))
-    compact = domain_key(path)
-    candidates = {domain_key(t) for t in distinctive(company.core)}
-    if brand:
-        candidates |= {domain_key(t) for t in distinctive(name_tokens(brand))}
+    """Does the profile handle name the company (legal name, former names, brand, workplace brands, domain, initials)?"""
+    parts = urllib.parse.urlsplit(url)
+    raw_path = urllib.parse.unquote(parts.path + "?" + parts.query)
+    compact = domain_key(raw_path)
+    names = [company.name, *company.aliases, *company.brands] + ([brand] if brand else [])
+    candidates: set[str] = set()
+    for name in names:
+        toks = name_tokens(name)
+        candidates |= {domain_key(t) for t in distinctive(toks)}
+        joined = domain_key("".join(toks))
+        if len(joined) >= 4:
+            candidates.add(joined)
+        initials = "".join(t[0] for t in toks if t)
+        if len(initials) >= 3:
+            candidates.add(initials)
     label = domain_key(registrable(site_host).split(".")[0])
-    if len(label) >= 4:
+    if len(label) >= 3:
         candidates.add(label)
-    joined = domain_key("".join(company.core))
-    if len(joined) >= 4:
-        candidates.add(joined)
-    return any(token and token in compact for token in candidates)
+    if any(token and token in compact for token in candidates):
+        return True
+    segment = raw_path.strip("/").split("/")[-1].split("?")[0]
+    initials = _initials(segment)
+    return bool(initials and len(initials) >= 3 and (initials == label or initials in candidates))
+
+
+def opaque_handle(url: str) -> bool:
+    """Numeric/channel identifiers cannot carry a name, so name matching cannot be applied to them."""
+    return bool(OPAQUE_HANDLE.search(url))
 
 
 def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bool = True) -> dict[str, Any]:
@@ -646,10 +675,11 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     for item in found.values():
         by_platform.setdefault(item["platform"], []).append(item)
     for platform, items in by_platform.items():
-        keep = items
-        if len(items) > 1:
-            matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)]
-            keep = matching[:2] if matching else []
+        # A readable handle must name the company (or its brand/domain); opaque numeric/channel ids are accepted only
+        # when they are the site's single link for that platform. Owners' personal pages and parent-group profiles fail this.
+        matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)]
+        opaque = [i for i in items if opaque_handle(i["url"]) and i not in matching]
+        keep = matching[:2] if matching else (opaque[:1] if len(items) == 1 else [])
         for item in keep:
             doc = item["doc"]
             span = (f"[link] {item['raw']} {item['text']}".strip() if not item.get("jsonld") else None)
@@ -764,8 +794,13 @@ def jsonld_posts(ledger: Ledger, site: SiteResult) -> list[dict[str, Any]]:
     for doc, page in docs:
         for item in page.jsonld_flat():
             kind = str(item.get("@type", "")).lower()
-            if kind not in {"newsarticle", "blogposting", "article", "event", "pressrelease"}:
+            if kind not in {"newsarticle", "blogposting", "article", "pressrelease", "event"}:
                 continue
+            item_url = str(item.get("url") or item.get("@id") or "")
+            if str(item.get("@id", "")).endswith("#richSnippet"):
+                continue
+            if kind not in {"newsarticle", "pressrelease"} and not NEWS_PATH.search(urllib.parse.urlsplit(item_url or doc.url).path):
+                continue  # SEO plugins label ordinary pages as Article/BlogPosting
             title = str(item.get("headline") or item.get("name") or "").strip()
             date = str(item.get("datePublished") or item.get("startDate") or "")[:10]
             main_entity = item.get("mainEntityOfPage")
@@ -783,3 +818,115 @@ def jsonld_posts(ledger: Ledger, site: SiteResult) -> list[dict[str, Any]]:
             if claim:
                 posts.append({"date": date, "title": title, "url": url or doc.url, "claim_id": claim["id"]})
     return posts
+
+
+MONTHS = {"januar": 1, "january": 1, "jan": 1, "februar": 2, "february": 2, "feb": 2, "mars": 3, "march": 3, "mar": 3, "april": 4,
+          "apr": 4, "mai": 5, "may": 5, "juni": 6, "june": 6, "jun": 6, "juli": 7, "july": 7, "jul": 7, "august": 8, "aug": 8,
+          "september": 9, "sep": 9, "sept": 9, "oktober": 10, "october": 10, "okt": 10, "oct": 10, "november": 11, "nov": 11,
+          "desember": 12, "december": 12, "des": 12, "dec": 12}
+DATE_PATTERNS = (
+    re.compile(r"(?<!\d)(?P<d>[0-3]?\d)\.(?P<m>[01]?\d)\.(?P<y>20\d\d)(?!\d)"),
+    re.compile(r"(?<!\d)(?P<y>20\d\d)-(?P<m>[01]\d)-(?P<d>[0-3]\d)(?!\d)"),
+    re.compile(r"(?<!\d)(?P<d>[0-3]?\d)\.?\s+(?P<mon>[A-Za-zæøåÆØÅ]{3,9})\.?\s+(?P<y>20\d\d)(?!\d)"),
+)
+
+
+def find_date(text: str, today: str) -> tuple[str, str] | None:
+    """First plausible publication date in ``text`` as (iso, matched text); never in the future, not older than 4 years."""
+    for pattern in DATE_PATTERNS:
+        for match in pattern.finditer(text):
+            parts = match.groupdict()
+            month = int(parts["m"]) if parts.get("m") else MONTHS.get((parts.get("mon") or "").lower().rstrip("."))
+            if not month:
+                continue
+            try:
+                iso = f"{int(parts['y']):04d}-{month:02d}-{int(parts['d']):02d}"
+                import datetime as _dt
+                _dt.date.fromisoformat(iso)
+            except ValueError:
+                continue
+            if iso <= today and iso >= f"{int(today[:4]) - 4}{today[4:]}":
+                return iso, match.group(0)
+    return None
+
+
+NAV_TEXT = re.compile(r"(flere (saker|nyheter|artikler)|les mer|se (alle|flere)|alle (nyheter|saker|artikler)|arkiv|"
+                      r"more news|all news|read more|view all|neste side|forrige side)")
+NEWS_PATH = re.compile(r"(nyhet|aktuelt|news|blogg|blog|presse|artikl|article|innlegg|arkiv)", re.I)
+
+
+def news_items(ledger: Ledger, site: SiteResult, today: str, extra_pages: list[tuple[FetchResult, Page]] | None = None,
+               limit: int = 8) -> list[dict[str, Any]]:
+    """Dated news teasers on the verified site.
+
+    Conservative pairing: the date must be inside the link text, or be the only date on the line directly
+    before/after the link text, and that date line must not be claimed by a second teaser."""
+    posts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    site_root = registrable(host_of(site.home_url))
+    for doc, page in page_documents(site.pages + (extra_pages or []), "company_owned_website"):
+        lines = page.text.split("\n")
+        index_of: dict[str, int] = {}
+        for i, line in enumerate(lines):
+            index_of.setdefault(line.strip(), i)
+        candidates = []
+        for link in page.links:
+            url = link.url.split("#")[0]
+            text = link.text.strip()
+            if len(text) < 15 or url in seen or not host_of(url).endswith(site_root):
+                continue
+            if NAV_TEXT.search(fold(text)):
+                continue
+            path = urllib.parse.urlsplit(url).path.rstrip("/")
+            if len(path) < 8 or url.rstrip("/") == site.home_url.rstrip("/"):
+                continue
+            if not (NEWS_PATH.search(path) or NEWS_PATH.search(urllib.parse.urlsplit(page.url).path)):
+                continue
+            found = find_date(text, today)
+            if found:
+                candidates.append((url, text, found, text, None))
+                continue
+            i = index_of.get(text)
+            if i is None:
+                continue
+            near = []
+            for j in (i - 1, i + 1):
+                if 0 <= j < len(lines):
+                    hit = find_date(lines[j], today)
+                    if hit and len(lines[j]) <= 60:
+                        near.append((j, hit))
+            if len(near) != 1:
+                continue
+            j, hit = near[0]
+            window = " ".join(lines[min(i, j): max(i, j) + 1])
+            candidates.append((url, text, hit, window, j))
+        used: dict[int, int] = {}
+        for *_, j in candidates:
+            if j is not None:
+                used[j] = used.get(j, 0) + 1
+        for url, text, (iso, raw_date), window, j in candidates:
+            if j is not None and used.get(j, 0) > 1:
+                continue
+            title = re.sub(r"\s+", " ", text.replace(raw_date, " ")).strip(" -–|·,") if raw_date in text else text
+            if len(title) < 10 or url in seen:
+                continue
+            seen.add(url)
+            claim = ledger.text_claim(doc, window[:480], "activity", "website_post", {"title": title[:80], "published": raw_date},
+                                      qualifier=url, display=f"{iso} — {title[:160]}", effective_at=iso, confidence=0.85,
+                                      method="dated_teaser_on_verified_site", extra={"event_date": iso, "url": url})
+            if claim:
+                posts.append({"date": iso, "title": title, "url": url, "claim_id": claim["id"]})
+            if len(posts) >= limit:
+                return posts
+    return posts
+
+
+def news_page_url(site: SiteResult) -> str | None:
+    home = site.pages[0][1]
+    site_root = registrable(host_of(site.home_url))
+    for link in home.links:
+        path = urllib.parse.urlsplit(link.url).path.lower()
+        if host_of(link.url).endswith(site_root) and re.fullmatch(r"/?(no/|nb/|en/)?(nyheter|aktuelt|news|blogg|blog|presse|artikler|"
+                                                                    r"nyheiter|siste-nytt|pressemeldinger)/?", path):
+            return link.url.split("#")[0]
+    return None

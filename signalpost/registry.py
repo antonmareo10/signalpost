@@ -27,6 +27,9 @@ ROLE_LABELS = {
     "EIKM": "Owner municipality", "BOBE": "Estate administrator", "STIF": "Founder", "PROK": "Procuration",
     "SIGN": "Signature right", "POFE": "Signature/procuration", "ADOS": "Administrative unit", "DIRE": "Director",
 }
+GROUP_LABELS = {"DAGL": "Chief executive", "STYR": "Board", "REVI": "Auditor", "REGN": "Accountant", "KONT": "Contact person",
+                "DTPR": "Partners", "DTSO": "Partners", "INNH": "Owner", "SIGN": "Signature rights", "PROK": "Procuration",
+                "FFØR": "Business manager", "KOMP": "General partner", "EIKM": "Owner municipality", "BEST": "Managing shipowner"}
 PERSON_FIELDS_TO_DROP = ("fodselsdato",)
 
 
@@ -166,7 +169,10 @@ def account_claims(ledger: Ledger, result: FetchResult) -> tuple[str, list[dict[
         base = f"/{index}"
         currency = record.get("valuta") or "NOK"
         ledger.json_claim(doc, f"{base}/regnskapsperiode", "accounts", "accounting_period", qualifier=qual,
-                          value={"from": period.get("fraDato"), "to": period.get("tilDato")}, display=period_label, period=period_label)
+                          value={"from": period.get("fraDato"), "to": period.get("tilDato")},
+                          display=f"{'Group' if account_type == 'KONSERN' else 'Company'} accounts filed for {period_label}",
+                          period=period_label, effective_at=period.get("tilDato"),
+                          extra={"year": year, "account_type": account_type})
         row = {"year": year, "account_type": account_type, "period": period_label, "currency": currency}
         for field_name, pointer, label in ACCOUNT_FIELDS:
             try:
@@ -247,9 +253,11 @@ def role_claims(ledger: Ledger, result: FetchResult, fetcher: Fetcher) -> tuple[
                 people.append({"role_code": code, "role": label, "name": claim["display"].split(": ", 1)[-1], "claim_id": claim["id"],
                                "last_changed": changed})
         if changed:
+            group_code = (group.get("type") or {}).get("kode")
+            label = GROUP_LABELS.get(group_code, (group.get("type") or {}).get("beskrivelse") or group_code)
             ledger.json_claim(doc, f"/rollegrupper/{gi}/sistEndret", "activity", "registry_role_change",
-                              qualifier=(group.get("type") or {}).get("kode"), effective_at=changed,
-                              display=f"{(group.get('type') or {}).get('beskrivelse')} last changed in the register on {changed}",
+                              qualifier=group_code, effective_at=changed,
+                              display=f"{label} entry last changed in the register on {changed}",
                               extra={"event_date": changed})
     return ("available" if people else "not_available"), people
 

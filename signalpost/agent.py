@@ -23,7 +23,7 @@ from .registry import (account_claims, entity_claims, fetch_accounts, fetch_enti
 from .search import SearchProvider
 from .synth import build_summary
 from .web import (FREEMAIL, Candidate, Company, SiteResearcher, candidate_slugs, extract_site, feed_posts, handle_matches, host_of,
-                  jsonld_posts, name_tokens, normalize_site_url, phone_digits, registrable)
+                  jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits, registrable)
 
 SECTIONS = ("identity", "accounts", "people", "website", "hiring", "activity")
 STATES = {"available", "not_available", "blocked", "not_applicable", "ambiguous", "failed"}
@@ -61,7 +61,7 @@ class Agent:
         self.deadline = time.monotonic() + time_budget_s
         self.guess_domains = guess_domains
         self.nav = NavJobs(self.fetcher, cache_dir=cache_dir, mode=nav_mode)
-        self.search = SearchProvider.from_env(self.fetcher, max_calls=max_search) if use_search else None
+        self.search = SearchProvider.from_env(self.fetcher, max_calls=max_search, cache_dir=cache_dir) if use_search else None
         self.search_min_revenue = search_min_revenue
         self.sites = SiteResearcher(self.fetcher)
         self.log = log
@@ -77,6 +77,11 @@ class Agent:
     # -- phase A: official registers --------------------------------------------------------------
     def official(self, work: Work, bulk_row: dict[str, Any] | None) -> None:
         org, ledger = work.org, work.ledger
+        if self.remaining() < 15:
+            work.errors.append({"section": "identity", "error": "time budget exhausted before this company was researched"})
+            for section in ("identity", "accounts", "people"):
+                work.states[section] = "failed"
+            return
         result = fetch_entity(self.fetcher, org)
         state, entity = entity_claims(ledger, result)
         if state != "available":
@@ -234,8 +239,8 @@ class Agent:
                 continue
             if result.state == "related" and related is None:
                 related = result
-            if result.state == "blocked":
-                blocked = True
+            if result.state == "blocked" and candidate.strength in ("strong", "medium"):
+                blocked = True  # a refused *guess* says nothing about the company's own site
         if verified:
             work.site = extract_site(ledger, company, verified)
             for extra in extra_sites:
@@ -243,6 +248,14 @@ class Agent:
                 work.site.setdefault("additional", []).append({"url": extra_info["url"], "claim_id": extra_info.get("claim_id")})
             if self.remaining() > 20:
                 work.posts = feed_posts(self.fetcher, ledger, verified) + jsonld_posts(ledger, verified)
+                if not work.posts:
+                    extra_pages = []
+                    news_url = news_page_url(verified)
+                    if news_url and self.remaining() > 20:
+                        result, page = self.sites._fetch_page(news_url)
+                        if page is not None and host_of(result.final_url or news_url).endswith(registrable(host_of(verified.home_url))):
+                            extra_pages.append((result, page))
+                    work.posts = news_items(ledger, verified, self.today, extra_pages)
             work.states["website"] = "available" if work.site.get("claim_id") else "failed"
         elif related:
             work.states["website"] = "ambiguous"

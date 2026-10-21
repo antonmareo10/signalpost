@@ -6,9 +6,11 @@ pass the same exact-entity gate on the independently fetched website before anyt
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
+from pathlib import Path
 import urllib.parse
 from typing import Any
 
@@ -51,21 +53,24 @@ class SearchProvider:
     name = "none"
     cost_per_call = 0.0
 
-    def __init__(self, fetcher: Fetcher, key: str, max_calls: int) -> None:
+    def __init__(self, fetcher: Fetcher, key: str, max_calls: int, cache_dir: str | None = None) -> None:
         self.fetcher = fetcher
         self.key = key
         self.max_calls = max_calls
+        self.cache_dir = Path(cache_dir) / "search" / self.name if cache_dir else None
+        if self.cache_dir:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.calls = 0
         self.cost = 0.0
         self.lock = threading.Lock()
         self.last_cost = 0.0
 
     @staticmethod
-    def from_env(fetcher: Fetcher, max_calls: int = 400) -> "SearchProvider | None":
-        if os.environ.get("TAVILY_API_KEY"):
-            return Tavily(fetcher, os.environ["TAVILY_API_KEY"], max_calls)
+    def from_env(fetcher: Fetcher, max_calls: int = 400, cache_dir: str | None = None) -> "SearchProvider | None":
         if os.environ.get("BRAVE_API_KEY"):
-            return Brave(fetcher, os.environ["BRAVE_API_KEY"], max_calls)
+            return Brave(fetcher, os.environ["BRAVE_API_KEY"], max_calls, cache_dir)
+        if os.environ.get("TAVILY_API_KEY"):
+            return Tavily(fetcher, os.environ["TAVILY_API_KEY"], max_calls, cache_dir)
         return None
 
     def _reserve(self) -> bool:
@@ -83,10 +88,17 @@ class SearchProvider:
 
     def find_sites(self, company: Company) -> list[str]:
         self.last_cost = 0.0
-        if not self._reserve():
-            return []
-        self.last_cost = self.cost_per_call
-        urls = self._search(self.query_for(company))
+        query = self.query_for(company)
+        cache_file = self.cache_dir / (hashlib.sha1(query.encode("utf-8")).hexdigest() + ".json") if self.cache_dir else None
+        if cache_file and cache_file.exists():
+            urls = json.loads(cache_file.read_text(encoding="utf-8"))
+        else:
+            if not self._reserve():
+                return []
+            self.last_cost = self.cost_per_call
+            urls = self._search(query)
+            if cache_file:
+                cache_file.write_text(json.dumps(urls), encoding="utf-8")
         out: list[str] = []
         for url in urls:
             host = host_of(url)
