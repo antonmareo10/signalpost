@@ -192,6 +192,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     envelopes = [envelopes_by_org.get(org) or failed_envelope(org, run_id, "invalid organisation number" if org not in valid
                                                                else "agent error before this company finished") for org in inputs]
     write_jsonl(out, envelopes)
+    if args.profiles_output:
+        write_jsonl(Path(args.profiles_output), envelopes)
     history_dir.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out, history_dir / f"{run_id}.jsonl")
     report = build_report(envelopes, agent, args, started, inputs)
@@ -238,6 +240,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--no-search", action="store_true", help="disable the optional search provider even if a key is set")
     run.add_argument("--max-search", type=int, default=int(os.environ.get("SIGNALPOST_MAX_SEARCH", "400")))
     run.add_argument("--nav-mode", choices=("names", "full"), default=os.environ.get("SIGNALPOST_NAV_MODE", "names"))
+    # accepted for drop-in compatibility with the starter kit's batch command line
+    run.add_argument("--profiles-output", default=None, help="also write the envelopes here (starter-kit compatibility)")
+    run.add_argument("--checkpoint-every", type=int, default=None, help=argparse.SUPPRESS)
+    run.add_argument("--resume", action="store_true", help=argparse.SUPPRESS)
+    run.add_argument("--modules", default=None, help=argparse.SUPPRESS)
     run.set_defaults(func=cmd_run)
     site = sub.add_parser("site", help="rebuild the static viewer from an envelopes file")
     site.add_argument("--envelopes", required=True)

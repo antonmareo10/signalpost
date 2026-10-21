@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from signalpost.html import parse_html  # noqa: E402
 from signalpost.ledger import canonical_json, resolve_pointer, squash, supports  # noqa: E402
+from signalpost.net import _to_text  # noqa: E402
 
 
 def main() -> None:
@@ -43,7 +44,8 @@ def main() -> None:
                 outcome["snapshot_missing"] += 1
                 failures.append({"org": env["organisation_number"], "evidence": ev["id"], "why": "snapshot missing", "url": ev["source_url"]})
                 continue
-            raw = gzip.decompress(path.read_bytes()).decode("utf-8", "replace")
+            body = gzip.decompress(path.read_bytes())
+            raw = _to_text(body, "application/json" if ev["source_class"].startswith("official") else "")
             span = ev["claim_span"]
             ok = False
             if ev["locator"].startswith("/") or (ev["locator"] == "" and ev["source_class"].startswith("official")):

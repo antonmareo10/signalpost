@@ -56,10 +56,20 @@ PARKED = ("is parked", "has expired", "parkedweb", "does not have an active webs
           "web hosting by one.com", "one.com website builder", "domeneshop - norsk domeneregistrar", "dette domenet er registrert")
 AGENCY_HINTS = ("levert av", "utviklet av", "laget av", "design av", "designet av", "designed by", "developed by", "powered by",
                 "webdesign", "nettside av", "nettsider fra", "hjemmeside av", "produsert av", "made by", "website by", "drevet av")
-CAREER_PATH = re.compile(r"(karriere|ledige[-_]?stilling|stillinger|jobb[-_]?hos|jobbe[-_]?hos|/jobb(?:er)?(?:/|$)|/jobs?(?:/|$)|"
-                         r"career|careers|join[-_]?us|bli[-_]?med|rekruttering|vi[-_]?ansetter|ledig[-_]?stilling)", re.I)
-CAREER_TEXT = re.compile(r"^(karriere|ledige stillinger|stillinger|jobb hos oss|jobbe hos oss|jobb|jobs|careers?|join us|bli med( oss)?|"
+# A careers page is matched on whole path segments (so "utstillinger" or "bestillinger" never match) and never on dated
+# news paths such as /2022/05/23/ledig-stilling/.
+CAREER_SEGMENT = re.compile(r"^(karriere|karrierer|career|careers|jobb|jobber|jobs?|ledige[-_]?stillinger|ledig[-_]?stilling|stillinger|"
+                            r"jobb[-_]?hos[-_\w]*|jobbe[-_]?(hos|i|med)[-_\w]*|join[-_]?us|bli[-_]?med[-_]?oss|rekruttering|"
+                            r"vi[-_]?ansetter|work[-_]?with[-_]?us|jobbmuligheter|arbeid[-_]?hos[-_]?oss)$", re.I)
+CAREER_TEXT = re.compile(r"^(karriere|ledige stillinger|stillinger|jobb hos oss|jobbe hos oss|jobb|jobs|careers?|join us|bli med oss|"
                          r"vi ansetter|ledig stilling|jobbmuligheter|work with us|jobbe i [\w ]+)$", re.I)
+
+
+def career_path(path: str) -> bool:
+    segments = [s for s in urllib.parse.unquote(path).lower().split("/") if s]
+    if not segments or re.search(r"/20\d\d/", path) or any(s in {"product", "produkt", "produkter", "shop", "nettbutikk"} for s in segments):
+        return False
+    return any(CAREER_SEGMENT.match(s) for s in segments[:3])
 ATS_HOSTS = ("webcruiter.no", "webcruiter.com", "jobbnorge.no", "recman.no", "recman.io", "teamtailor.com", "jobylon.com",
              "easycruit.com", "reachmee.com", "hrmanager.no", "varbi.com", "smartrecruiters.com", "workable.com", "lever.co",
              "greenhouse.io", "talentech.com", "simployer.com", "jobsite.no", "hr-manager.net", "candidate.hr-manager.net",
@@ -217,10 +227,10 @@ class SiteResearcher:
         self._unique_lock = threading.Lock()
 
     # -- fetching ----------------------------------------------------------------------------
-    def _fetch_page(self, url: str) -> tuple[FetchResult, Page | None]:
-        result = self.fetcher.get(url, respect_robots=True, max_bytes=2_500_000, timeout=12)
+    def _fetch_page(self, url: str, retries: int = 0) -> tuple[FetchResult, Page | None]:
+        result = self.fetcher.get(url, respect_robots=True, max_bytes=2_500_000, timeout=12, retries=retries)
         if result.status is None and url.startswith("https://") and not result.blocked:
-            alt = self.fetcher.get("http://" + url[len("https://"):], respect_robots=True, max_bytes=2_500_000, timeout=12)
+            alt = self.fetcher.get("http://" + url[len("https://"):], respect_robots=True, max_bytes=2_500_000, timeout=12, retries=0)
             if alt.status is not None:
                 result = alt
         if not result.ok or "html" not in (result.content_type or "html").lower():
@@ -228,7 +238,7 @@ class SiteResearcher:
         return result, parse_html(result.text, result.final_url or url)
 
     def research(self, company: Company, candidate: Candidate) -> SiteResult:
-        result, home = self._fetch_page(candidate.url)
+        result, home = self._fetch_page(candidate.url, retries=1 if candidate.strength in ("strong", "medium") else 0)
         if result.blocked:
             return SiteResult(candidate, "blocked", result.error or "blocked")
         if result.status in (401, 403, 429):
@@ -579,8 +589,9 @@ def acceptable_brand(brand: str, company: Company, site_host: str) -> bool:
     toks = tokens(text)
     if toks and toks[-1] in {"as", "asa", "sa", "da", "ans", "ag", "gmbh", "ab", "ltd", "inc"} and toks != tokens(company.name):
         return False
-    if fold(text) in {fold(p) for p in company.people}:
-        return False
+    brand_tokens = set(tokens(text))
+    if any(brand_tokens and brand_tokens <= set(tokens(person)) for person in company.people):
+        return False  # a registered person's name (e.g. the owner) is not a company brand
     label = domain_key(registrable(site_host).split(".")[0])
     shared = set(distinctive(name_tokens(text))) & (set(distinctive(company.core)) | {t for t in [label] if len(t) >= 3})
     return bool(shared) or domain_key(text) in label or label in domain_key(text)
@@ -743,7 +754,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
             path = urllib.parse.urlsplit(link.url).path
             is_ats = any(host == ats or host.endswith("." + ats) for ats in ATS_HOSTS)
             own = host.endswith(registrable(site_host))
-            if not (is_ats or (own and (CAREER_PATH.search(path) or CAREER_TEXT.match(fold(link.text).strip())))):
+            if not (is_ats or (own and (career_path(path) or (CAREER_TEXT.match(fold(link.text).strip()) and not re.search(r"/20\d\d/", path))))):
                 continue
             url = link.url.split("#")[0]
             if url in seen_career or len(seen_career) >= 2:

@@ -17,7 +17,7 @@ from signalpost.ledger import Document, Ledger, canonical_json, supports  # noqa
 from signalpost.nav import NavJobs  # noqa: E402
 from signalpost.refresh import diff  # noqa: E402
 from signalpost.synth import build_summary, check_sentence  # noqa: E402
-from signalpost.web import (Candidate, Company, SiteResearcher, acceptable_brand, address_on_page, candidate_slugs,  # noqa: E402
+from signalpost.web import (Candidate, Company, SiteResearcher, acceptable_brand, address_on_page, candidate_slugs, career_path,  # noqa: E402
                             foreign_entity_handle, handle_matches, legal_name_hit, name_tokens, normalize_social, opaque_handle,
                             valid_orgnr)
 
@@ -131,6 +131,13 @@ class SocialTests(unittest.TestCase):
         self.assertFalse(foreign_entity_handle(Company(org="1", name="AF GRUPPEN ASA"), "https://www.linkedin.com/company/af-gruppen"))
         self.assertFalse(foreign_entity_handle(Company(org="1", name="ENTRA ASA", aliases=["ENTRA EIENDOM AS"]),
                                                "https://www.linkedin.com/company/entra-eiendom-as"))
+
+    def test_careers_paths(self):
+        self.assertTrue(career_path("/om-oss/ledige-stillinger/"))
+        self.assertTrue(career_path("/jobb-hos-oss/"))
+        self.assertFalse(career_path("/utstillinger/"))          # exhibitions, not jobs
+        self.assertFalse(career_path("/mine-bestillinger"))      # orders
+        self.assertFalse(career_path("/2022/05/23/ledig-stilling/"))  # old news post
 
     def test_brand_rules(self):
         self.assertFalse(acceptable_brand("Knut Hovet AS", Company(org="1", name="KNUT HOVET INSTALLASJONAR AS"), "hovet.com"))

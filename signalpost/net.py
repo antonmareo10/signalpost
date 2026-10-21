@@ -195,7 +195,8 @@ class Fetcher:
         attempt = 0
         while True:
             result = self._raw_get(url, accept=accept, headers=headers, max_bytes=max_bytes, timeout=timeout, data=data)
-            transient = result.status in (429, 500, 502, 503, 504) or (result.status is None and result.error and "timed out" in result.error)
+            transient = result.status in (429, 500, 502, 503, 504) or (result.status is None and bool(result.error)
+                                                                        and not result.error.startswith("unsafe"))
             if transient and attempt < retries:
                 attempt += 1
                 time.sleep(1.5 * attempt)

@@ -1,9 +1,9 @@
 {
   "run_id": "smoke-2026-10-21-b",
   "agent_version": "1.0.0",
-  "started_at": "2026-10-21T17:20:23Z",
-  "completed_at": "2026-10-21T17:21:35Z",
-  "wall_clock_seconds": 72.4,
+  "started_at": "2026-10-21T17:44:48Z",
+  "completed_at": "2026-10-21T17:45:57Z",
+  "wall_clock_seconds": 69.2,
   "inputs": 100,
   "emitted_envelopes": 100,
   "status_counts": {
@@ -21,9 +21,10 @@
     },
     "website": {
       "available": 8,
-      "not_available": 89,
+      "not_available": 88,
       "blocked": 2,
-      "ambiguous": 1
+      "ambiguous": 1,
+      "failed": 1
     },
     "hiring": {
       "not_available": 99,
@@ -40,9 +41,9 @@
       "claims": 201
     },
     "brand": {
-      "companies": 4,
-      "company_share": 0.04,
-      "claims": 4
+      "companies": 3,
+      "company_share": 0.03,
+      "claims": 3
     },
     "company_profiles": {
       "companies": 3,
@@ -86,31 +87,31 @@
     }
   },
   "operations": {
-    "requests": 738,
-    "bytes": 102412973,
-    "p50_request_ms": 1015,
-    "p95_request_ms": 2733,
-    "p50_company_ms": 6828,
-    "p95_company_ms": 11984,
+    "requests": 744,
+    "bytes": 102412423,
+    "p50_request_ms": 968,
+    "p95_request_ms": 1500,
+    "p50_company_ms": 4750,
+    "p95_company_ms": 10376,
     "third_party_cost_usd": 0.0,
     "search_provider": null,
     "search_calls": 0,
     "nav_feed": {
       "state": "available",
       "pages": 182,
-      "active_ads": 9775,
+      "active_ads": 9778,
       "matched_companies": 0,
       "error": null
     },
     "top_hosts": {
       "data.brreg.no": 411,
       "pam-stilling-feed.nav.no": 183,
-      "devoldsregnskap.no": 6,
+      "www.aelektronikk.no": 6,
       "7-eleven.no": 6,
-      "supermercado.no": 5,
-      "svorka.no": 5,
-      "www.aiota.no": 5,
-      "atg.no": 5
+      "devoldsregnskap.no": 6,
+      "stronen.no": 5,
+      "atg.no": 5,
+      "svorka.no": 5
     }
   },
   "validation": {

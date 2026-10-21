@@ -9,7 +9,7 @@ locally. These are the measurements we can make, all with the committed code and
 |---|---|
 | 100-company smoke test (`samples/smoke-100.jsonl`, the starter kit's seed 20260823) | 100/100 envelopes, input order kept, all states terminal, every claim has evidence with URL + time + SHA-256 — see `docs/smoke/run-report.json` |
 | Refresh idempotency (same batch run twice) | 0 changes, 0 carried-forward claims on the second run (`docs/smoke/` is the second run) |
-| Independent evidence audit (`eval/audit_evidence.py`) on the Builderr-sample run | 10,509 / 10,509 stored excerpts re-found in their snapshots (100%); 4 NAV ads verified against the stored projection (raw ads with contact persons are deliberately not kept) |
+| Independent evidence audit (`eval/audit_evidence.py`) | smoke-100: 8,018 / 8,018 excerpts re-found in their stored snapshots; Builderr sample: 10,509 / 10,509; NAV ads are verified against a stored projection (raw ads with contact persons are deliberately not kept) |
 | Synthesis gate | sentences whose numbers are not cited values or declared computations are dropped (0 dropped in the smoke run) |
 | Unit tests | 24 offline tests: `python -m unittest discover -s tests` (Python 3.11 and 3.14) |
 | Runtime (24 workers) | 100 companies ≈ 75 s; 300 ≈ 3.6 min; **1,000 ≈ 9.6 min** (5,859 requests, p95 per company 16 s, US$0) |

@@ -205,6 +205,7 @@ class Agent:
         verified = None
         extra_sites: list[Any] = []
         related = None
+        unreachable_own = False
         blocked = False
         candidates = self.candidates(work)
         tried_search = False
@@ -244,6 +245,8 @@ class Agent:
                 continue
             if result.state == "related" and related is None:
                 related = result
+            if result.state == "unreachable" and candidate.strength in ("strong", "medium") and "HTTP" not in result.reason:
+                unreachable_own = True  # network failure on the company's own registered domain: we could not check
             if result.state == "blocked" and candidate.strength in ("strong", "medium"):
                 blocked = True  # a refused *guess* says nothing about the company's own site
         if verified:
@@ -267,7 +270,10 @@ class Agent:
             work.notes["website"] = f"{related.home_url}: {related.reason}"
         elif blocked:
             work.states["website"] = "blocked"
-            work.notes["website"] = "candidate website refused automated access (robots.txt)"
+            work.notes["website"] = "candidate website refused automated access (robots.txt or HTTP 401/403/429)"
+        elif unreachable_own:
+            work.states["website"] = "failed"
+            work.notes["website"] = "the registered website could not be reached in this run (network error); previous values are kept"
         else:
             work.states["website"] = "not_available"
             if not candidates:
