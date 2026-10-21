@@ -53,7 +53,7 @@ class Work:
 class Agent:
     def __init__(self, *, run_id: str, snapshot_dir: str | None, cache_dir: str | None, workers: int = 16,
                  time_budget_s: float = 3000, guess_domains: bool = True, nav_mode: str = "names", use_search: bool = True,
-                 search_min_revenue: float = 5_000_000, max_search: int = 400, log=print) -> None:
+                 search_min_revenue: float = 2_000_000, max_search: int = 400, log=print) -> None:
         self.run_id = run_id
         self.fetcher = Fetcher(snapshot_dir=snapshot_dir)
         self.cache_dir = cache_dir
@@ -276,9 +276,11 @@ class Agent:
         return any(c.source.startswith("registry") for c in candidates[index:])
 
     def _search_worthy(self, company: Company) -> bool:
-        if re.search(r"\b(holding|invest|eiendom|eiendommer)\b", company.name.lower()):
+        if re.search(r"\b(holding|invest|investering|eiendom|eiendommer|property|properties)\b", company.name.lower()):
             return False
-        return (company.employees or 0) >= 5 or (company.revenue or 0) >= self.search_min_revenue
+        if company.industry.startswith(("64.2", "64.3", "68.2", "70.1")) or company.legal_form in ("BRL", "ESEK", "BBL", "SAM"):
+            return False
+        return (company.employees or 0) >= 1 or (company.revenue or 0) >= self.search_min_revenue
 
     # -- batch ------------------------------------------------------------------------------------------
     def run(self, orgs: list[str], bulk: dict[str, dict[str, Any]] | None = None,

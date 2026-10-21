@@ -1,0 +1,1467 @@
+{
+ "source": "https://builderr.ai/signalpost",
+ "rows": [
+  {
+   "organisation_number": "938702675",
+   "name": "AF GRUPPEN ASA",
+   "website": "afgruppen.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/afgruppen",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/af_gruppen",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/af-gruppen",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/user/afgruppen",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/af-gruppen-asa",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 9,
+   "linkedin_jobs": 7
+  },
+  {
+   "organisation_number": "995754606",
+   "name": "CONSTO AS",
+   "website": "consto.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/constokonsern",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/consto-as",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "837895502",
+   "name": "HAUGESUND SPAREBANK",
+   "website": "haugesund-sparebank.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/haugesundsparebank",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/haugesundsparebank",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/haugesund-sparebank",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "979543883",
+   "name": "DIPS AS",
+   "website": "dips.com",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/dips.no",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/dips_as",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/dips-asa",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/user/dipsasa",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 9,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "999296432",
+   "name": "ENTRA ASA",
+   "website": "entra.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/entraasa",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/entra-asa",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/entra-eiendom-as",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/user/entraeiendom",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 1
+  },
+  {
+   "organisation_number": "976605713",
+   "name": "KITRON ASA",
+   "website": "kitron.com",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/kitrongroup",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/kitrongroup",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/kitron",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/@kitrongroup",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "976695372",
+   "name": "TGS ASA",
+   "website": "tgs.com",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/tgs_220114",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/@tgs8281",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "975536440",
+   "name": "ENERGISENTERET DA",
+   "website": "eis.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/energisenteret",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/user/energisenteret",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/energisenteret-da",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "920237126",
+   "name": "ATEA ASA",
+   "website": "atea.com",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/atea-asa",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "966820152",
+   "name": "NORDIC DOOR AS",
+   "website": "nordicdoor.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/nordicdoor",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/nordicdoor",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/nordic-door-as",
+     "rights": "experimental"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/@nordicdooras",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "878612752",
+   "name": "RAGASCO AS",
+   "website": "ragasco.com",
+   "handles": [
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/user/hexagonragasco",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/ragasco-as",
+     "rights": "approved"
+    },
+    {
+     "platform": "x",
+     "url": "https://x.com/hexagon_ragasco",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 5,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "999256864",
+   "name": "SENTIA ASA",
+   "website": "sentiagruppen.com",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/sentia-asa",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 9,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "999164137",
+   "name": "ZAPTEC ASA",
+   "website": "zaptec.com",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/zaptecofficial",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/zaptec",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/gozaptec",
+     "rights": "approved"
+    },
+    {
+     "platform": "tiktok",
+     "url": "https://www.tiktok.com/@zaptec",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/@gozaptec",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 9,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "997777212",
+   "name": "ISCHEBECK NORDIC AS",
+   "website": "ischebeck.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/best-i-forskaling-no",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 9,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "971521902",
+   "name": "STIFTELSEN STEINERSKOLEN I BÆRUM",
+   "website": "stib.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/steinerskolenibaerum",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/steinerskolenbaerum",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "931932217",
+   "name": "HUSFLIDEN HOLMESTRAND SA",
+   "website": "norskflid.no",
+   "handles": [
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/@husfliden_holmestrand",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "982215668",
+   "name": "RSV GRUPPEN AS",
+   "website": "rsvgruppen.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/rsv-gruppen",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 1,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "990167826",
+   "name": "STIFTELSEN NASJONAL JAZZSCENE",
+   "website": "nasjonaljazzscene.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/nasjonaljazzscene",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/nasjonaljazzscene",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "814152162",
+   "name": "THE WELL AS",
+   "website": "thewell.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/thewellspa",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/thewellspahotel",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/the-well---en-verden-av-velvære",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 9,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "979299753",
+   "name": "HJELPEMIDDELSPESIALISTEN AS",
+   "website": "hm-spes.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/hjelpemiddelspesialisten",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/hjelpemiddelspesialisten",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/hjelpemiddelspesialisten-as",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 5,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "925703508",
+   "name": "PERVACO AS",
+   "website": "pervaco.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/pervaco-as",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 4,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "982178568",
+   "name": "STEINKJER BY- OG BYGDESERVICE SA",
+   "website": "steinkjerbygdeservice.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/steinkjerbygdeservice",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "971487046",
+   "name": "STIFTELSEN HAMMAREN",
+   "website": "barnehage.no",
+   "handles": [
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/hammarenbarnehage",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "983815251",
+   "name": "TEKNOMED AS",
+   "website": "teknomed.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/teknomed.no",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/teknomed-as",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "944379274",
+   "name": "TRANSPORTSENTRALEN VESTFOLD AS",
+   "website": "ts-vestfold.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/tsv-transportsentralen-vestfold-as",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "980545768",
+   "name": "NARVIK GOLFKLUBB",
+   "website": "narvikgolf.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/narvik-golfklubb",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "970601902",
+   "name": "NORDIC SUPPLY PARTNER AS",
+   "website": "nsp.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/nordicsupplypartner",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "997439376",
+   "name": "L.A FURELI MASKIN AS",
+   "website": "furelimaskin.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/furelimaskin",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "991123709",
+   "name": "SKJÆRETEKNIKK AS",
+   "website": "skjaereteknikk.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/skjaereteknikk",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "999614973",
+   "name": "STUDIX AS",
+   "website": "studix.com",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/studixapp",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "990090793",
+   "name": "CHRISTIANIA TAXI AS",
+   "website": "02365.no",
+   "handles": [
+    {
+     "platform": "x",
+     "url": "https://x.com/christianiataxi",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "991068287",
+   "name": "GULLSMED CAMILLA AS",
+   "website": "gullsmedcamilla.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/gullsmedcamilla",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/gullsmed_camilla",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "912048535",
+   "name": "SAILOR MUSIC AS",
+   "website": "sailormusic.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/sailormusicnorway",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/sailormusicnorway",
+     "rights": "approved"
+    },
+    {
+     "platform": "x",
+     "url": "https://x.com/sailormusicno",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "913229169",
+   "name": "TEKNISK SENTER AS",
+   "website": "teknisksenter.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/flekkefjordteknisksenter",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "985133530",
+   "name": "TØNSBERG MEDLAB AS",
+   "website": "tmedlab.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/tønsberg-medlab-as-158487117531756",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "993775770",
+   "name": "REVISJONSSENTERET AS",
+   "website": "revisjonssenteret.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/revisjonssenteret-as",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "912180328",
+   "name": "SHOC LIFESTYLE AS",
+   "website": "shoclifestyle.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/shoclifestyle",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/shoclifestyle",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "921861575",
+   "name": "THE MICE GURU AS",
+   "website": "themiceguru.com",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/themiceguru",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/themiceguruofficial",
+     "rights": "approved"
+    },
+    {
+     "platform": "x",
+     "url": "https://x.com/themiceguru",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "915198503",
+   "name": "HELL CATERING AS",
+   "website": "hell-catering.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/hell-catering-216511895382047",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "913979362",
+   "name": "KILSUND TRAVEL AS",
+   "website": "kilsundtravel.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/kilsundtravel.no",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "913884213",
+   "name": "SANOMEGA AS",
+   "website": "sanomega.as",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/sanomega3total",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/sanomega",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "917255342",
+   "name": "TRØNDELAG BETONG AS",
+   "website": "trondelag-betong.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/trondelagbetong",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "913170296",
+   "name": "WORK SYSTEM NORWAY AS",
+   "website": "worksystem.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/work-system-norway-as",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "971493399",
+   "name": "DIGNI",
+   "website": "digni.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/digninorge",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/digninorge",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "922532184",
+   "name": "HAIKJEFTEN AS",
+   "website": "haikjeften.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/haikjeften",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/haikjeften",
+     "rights": "approved"
+    },
+    {
+     "platform": "youtube",
+     "url": "https://www.youtube.com/@haikjeften4308",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "924437774",
+   "name": "ROSENBORG MURHÅNDTVERK AS",
+   "website": "murhandtverk.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/rosenborg.murhandtverk",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "832459372",
+   "name": "NORSK FISKEEKSPORT AS",
+   "website": "norskfiskeeksport.com",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/norsk-fiskeeksport",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "932098342",
+   "name": "BRANNKONTROLL NORGE AS",
+   "website": "brannkontrollnorge.no",
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/brannkontroll-norge",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "943672520",
+   "name": "PEAB BYGG AS",
+   "website": "peab.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "996547639",
+   "name": "LY FORSIKRING ASA",
+   "website": "lyforsikring.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/lyforsikring",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/lyforsikring",
+     "rights": "approved"
+    },
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/ly-forsikring",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 10,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "983717098",
+   "name": "LEIRVIK AS",
+   "website": "leirvik.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "983793347",
+   "name": "ODFJELL WELL SERVICES NORWAY AS",
+   "website": "odfjelltechnology.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "991853995",
+   "name": "BIEN SPAREBANK ASA",
+   "website": "bien.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/biensparebank",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/biensparebank",
+     "rights": "approved"
+    },
+    {
+     "platform": "x",
+     "url": "https://x.com/biensparebank",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "818711832",
+   "name": "LUFTAMBULANSETJENESTEN HF",
+   "website": "luftambulanse.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "910608193",
+   "name": "KAEFER ENERGY AS",
+   "website": "kaefer.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "869938432",
+   "name": "STIFTELSEN SILDAJAZZEN",
+   "website": "sildajazz.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "971339071",
+   "name": "SAMEIET ST OLAV",
+   "website": "st-olav.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "979214502",
+   "name": "STIFTELSEN HAVNAHUSET BU- OG SERVICESENTER",
+   "website": "vestbo.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "997275160",
+   "name": "TOTAL VVS AS",
+   "website": "total-vvs.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "990574855",
+   "name": "NOR-EL AS",
+   "website": "nor-el.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "957523730",
+   "name": "SALANGEN BOLIGSTIFTELSE",
+   "website": "salbos.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "982769221",
+   "name": "STRONGPOINT ASA",
+   "website": "strongpoint.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "914022940",
+   "name": "H. LUNDBECK AS",
+   "website": "lundbeck.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "985855137",
+   "name": "JUBEL EVENT AS",
+   "website": null,
+   "handles": [
+    {
+     "platform": "linkedin",
+     "url": "https://www.linkedin.com/company/jubel-event-as",
+     "rights": "experimental"
+    }
+   ],
+   "linkedin_experimental": true,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "933064883",
+   "name": "SIVLESGATE 14 AS",
+   "website": "vestbo.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "880376012",
+   "name": "SJØ-SPORT MANDAL AS",
+   "website": "sjo-sport.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "885681182",
+   "name": "SLIPETEKNIKK AS",
+   "website": "slipeteknikk.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "988943037",
+   "name": "SWIMEYE AS",
+   "website": "swimeye.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "976969324",
+   "name": "AV & PÅ ELEKTRO AS",
+   "website": "avogpaa.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "990002398",
+   "name": "FAGERAAS SKOGSDRIFT DA",
+   "website": "fageraasskogsdrift.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "997557689",
+   "name": "SAFE SOUND AUDIO AS",
+   "website": "safesound.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "929897404",
+   "name": "SOLVANG ASA",
+   "website": "solvangship.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "967292907",
+   "name": "STARINA AS",
+   "website": "starina.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "935762286",
+   "name": "VALDRES INSTALLASJON AS",
+   "website": "valdres-installasjon.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "991449175",
+   "name": "MOSA DESIGNLAB AS",
+   "website": "mosadesignlab.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "985628572",
+   "name": "NETSOLUTION VIKEN AS",
+   "website": "netsolution.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "986375473",
+   "name": "AGDER STUDIO AS",
+   "website": "protrackstudio.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "897270552",
+   "name": "KINKELIANE AS",
+   "website": "kinkeliane.no",
+   "handles": [
+    {
+     "platform": "facebook",
+     "url": "https://www.facebook.com/www.kinkeliane.no",
+     "rights": "approved"
+    },
+    {
+     "platform": "instagram",
+     "url": "https://www.instagram.com/kinkeliane",
+     "rights": "approved"
+    }
+   ],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "998578485",
+   "name": "NEERGÅRD REGNSKAP AS",
+   "website": "neergardregnskap.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "912004716",
+   "name": "PREREG AS",
+   "website": "prereg.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "923096728",
+   "name": "ROAD SUPPLY AS",
+   "website": "roadsupply.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "918853197",
+   "name": "RS GREEN POWER GROUP AS",
+   "website": "greenpowergroup.id",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "923884149",
+   "name": "STORD REINHALD AS",
+   "website": "stordreinhald.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "919694580",
+   "name": "KJØKKENDRIFT NO 1 RYGGE AS",
+   "website": "kitchn.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "820371542",
+   "name": "FJELD OG VANN AS",
+   "website": "fjeldogvann.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "820868382",
+   "name": "P.E. GAARUD AS",
+   "website": "pe-gaarud.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "923710930",
+   "name": "STRØMMEN TANNLEGESENTER AS",
+   "website": "strommentannlegesenter.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "923304290",
+   "name": "AKSLA AS",
+   "website": "akslail.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "923393528",
+   "name": "PRIVATKLINIKKEN I SKIEN AS",
+   "website": "privatklinikkeniskien.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "924913835",
+   "name": "PUMPETEKNIKK AS",
+   "website": "pumpeteknikk.as",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "925358916",
+   "name": "RENTALY AS",
+   "website": "rentaly.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "929034597",
+   "name": "TAKSTOLFABRIKKEN AS",
+   "website": "takstolfabrikken.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "926647288",
+   "name": "FJELLHEIMEN GALLERI AS",
+   "website": "fjellheimengalleri.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "834547252",
+   "name": "LAPSEN & CO AS",
+   "website": "lapsen.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "932738228",
+   "name": "A PLACE TO STAY STAVANGER AS",
+   "website": "aplacetostaystavanger.com",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "934652266",
+   "name": "DOLLY DIMPLES EGERSUND AS",
+   "website": "dolly.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "933775364",
+   "name": "GREENHEART AS",
+   "website": "greenheart-mindfulness.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "987526157",
+   "name": "SMOOTHIE XCHANGE AS",
+   "website": null,
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "979392710",
+   "name": "H&P MODU OPERATIONS AS",
+   "website": null,
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  },
+  {
+   "organisation_number": "953299216",
+   "name": "STOREBRAND BANK ASA",
+   "website": "storebrand.no",
+   "handles": [],
+   "linkedin_experimental": false,
+   "linkedin_posts": 0,
+   "linkedin_jobs": 0
+  }
+ ]
+}

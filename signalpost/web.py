@@ -8,6 +8,7 @@ the candidate's origin gets weaker (registry-listed > registry e-mail domain > g
 from __future__ import annotations
 
 import re
+import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -19,7 +20,8 @@ from .ledger import Document, Ledger, excerpt_around, fold, tokens
 from .net import Fetcher, FetchResult
 
 LEGAL_FORMS = {"as", "asa", "sa", "da", "ans", "nuf", "ba", "ks", "enk", "sti", "iks", "kf", "hf", "bl", "ab", "ltd", "limited",
-               "inc", "gmbh", "aps", "oy", "brl", "sti", "fli", "esek"}
+               "inc", "gmbh", "aps", "oy", "brl", "sti", "fli", "esek", "stiftelsen", "stiftelse", "stiftinga", "borettslag",
+               "borettslaget", "sameie", "sameiet", "eierseksjonssameie", "eierseksjonssameiet", "andelslag", "samvirkelag"}
 CONNECTORS = {"og", "and", "the", "i", "av", "for", "paa", "pa", "&"}
 LEGAL_SUFFIXES = {"as", "asa", "sa", "da", "ans", "nuf", "ba", "ks", "enk", "sti", "iks", "kf", "hf", "bl", "ab", "ltd", "limited",
                   "inc", "gmbh", "aps", "oy", "og", "and", "the", "i", "av", "for", "på", "pa", "&"}
@@ -210,6 +212,8 @@ class SiteResearcher:
     def __init__(self, fetcher: Fetcher, max_pages: int = 4) -> None:
         self.fetcher = fetcher
         self.max_pages = max_pages
+        self._unique_cache: dict[str, bool] = {}
+        self._unique_lock = threading.Lock()
 
     # -- fetching ----------------------------------------------------------------------------
     def _fetch_page(self, url: str) -> tuple[FetchResult, Page | None]:
@@ -226,6 +230,8 @@ class SiteResearcher:
         result, home = self._fetch_page(candidate.url)
         if result.blocked:
             return SiteResult(candidate, "blocked", result.error or "blocked")
+        if result.status in (401, 403, 429):
+            return SiteResult(candidate, "blocked", f"site refused automated access (HTTP {result.status})")
         if home is None:
             return SiteResult(candidate, "unreachable", result.error or f"HTTP {result.status}")
         final_host = host_of(result.final_url or candidate.url)
@@ -337,7 +343,46 @@ class SiteResearcher:
                         break
                 proof["name_anywhere"] = {"url": result.url, "excerpt": excerpt}
         proof["other_orgnrs"] = sorted(others)
+        home = pages[0][1]
+        lang = (home.lang or "").lower()[:2]
+        all_text = " ".join(p.text for _, p in pages)
+        proof["norwegian_context"] = bool(host_of(pages[0][0].final_url or "").endswith(".no") or lang in ("no", "nb", "nn")
+                                          or (company.postcode and company.postcode in all_text)
+                                          or (company.city and company.city.lower() in all_text.lower())
+                                          or re.search(r"\b(norge|norway|org\.? ?nr)\b", all_text, re.I))
         return proof
+
+    def _name_unique(self, company: Company) -> bool:
+        """True when no other registered entity or workplace (besides this company's own) carries all legal-name words.
+
+        Uses Brønnøysund's name search (relevance-ranked), so a namesake would appear among the first results."""
+        core = set(company.core)
+        if not core or len("".join(core)) < 6:
+            return False
+        key = " ".join(sorted(core))
+        with self._unique_lock:
+            if key in self._unique_cache:
+                return self._unique_cache[key]
+        query = urllib.parse.quote(" ".join(company.core))
+        unique = True
+        for kind, url in (("enheter", f"https://data.brreg.no/enhetsregisteret/api/enheter?navn={query}&size=50"),
+                          ("underenheter", f"https://data.brreg.no/enhetsregisteret/api/underenheter?navn={query}&size=50")):
+            result = self.fetcher.get(url, accept="application/json", retries=1, snapshot=False)
+            if not result.ok:
+                unique = False
+                break
+            for item in ((result.json() or {}).get("_embedded") or {}).get(kind, []):
+                owner = item.get("overordnetEnhet") or item.get("organisasjonsnummer")
+                if owner == company.org or item.get("organisasjonsnummer") == company.org:
+                    continue
+                if core <= set(name_tokens(item.get("navn") or "")):
+                    unique = False
+                    break
+            if not unique:
+                break
+        with self._unique_lock:
+            self._unique_cache[key] = unique
+        return unique
 
     def _decide(self, company: Company, candidate: Candidate, proof: dict[str, Any], final_host: str) -> tuple[str, float, str]:
         label = domain_key(registrable(final_host).split(".")[0])
@@ -351,6 +396,9 @@ class SiteResearcher:
         foreign = bool(proof["other_orgnrs"]) and not proof["orgnr"]
         if proof["orgnr"]:
             return "verified", 0.99, "organisation number shown on the site"
+        if candidate.strength != "strong" and not contact and not foreign and proof["name_identity"] and domain_name:
+            proof["name_unique_in_register"] = self._name_unique(company)
+
         if candidate.strength == "strong":
             if foreign and not proof["name_identity"]:
                 return "related", 0.5, f"site shows another organisation number ({', '.join(proof['other_orgnrs'][:2])})"
@@ -376,8 +424,10 @@ class SiteResearcher:
             return "rejected", 0.4, "insufficient exact-entity evidence"
         if proof["name_identity"] and contact:
             return "verified", 0.94, "legal name on the site plus registered contact detail"
-        if exact_name and (domain_name or contact) and final_host.endswith(".no"):
-            return "verified", 0.94, "the full registered legal name (unique in Norway) is printed on a matching .no site"
+        if exact_name and (domain_name or contact) and (final_host.endswith(".no") or domain_name):
+            return "verified", 0.94, "the full registered legal name (unique in Norway) is printed on a matching site"
+        if proof["name_identity"] and domain_name and proof.get("name_unique_in_register") and proof.get("norwegian_context"):
+            return "verified", 0.92, "on-site name and domain match the legal name, and no other registered entity carries that name"
         return "rejected", 0.3, "insufficient exact-entity evidence for a discovered domain"
 
 

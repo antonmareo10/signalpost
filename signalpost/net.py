@@ -169,10 +169,11 @@ class Fetcher:
         if not known:
             parser = None
             result = self._raw_get(origin + "/robots.txt", accept="text/plain", max_bytes=300_000, timeout=8)
+            # RFC 9309: 4xx = no robots policy (allowed); 5xx/unreachable = assume disallowed
             if result.status == 200 and result.text and "<html" not in result.text[:300].lower():
                 parser = urllib.robotparser.RobotFileParser()
                 parser.parse(result.text.splitlines())
-            elif result.status in (401, 403):
+            elif result.status is not None and result.status >= 500:
                 parser = urllib.robotparser.RobotFileParser()
                 parser.disallow_all = True
             with self._robots_guard:
