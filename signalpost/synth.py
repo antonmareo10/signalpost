@@ -170,6 +170,26 @@ def build_summary(ledger: Ledger, ctx: dict[str, Any]) -> dict[str, Any]:
         else:
             prefix = "The latest filed group accounts" if account_type == "KONSERN" else "The latest filed annual accounts"
             s.append(_sentence(f"{prefix} ({latest['year']}) show " + _join(parts) + ".", ids, derived))
+        if not (has_group and account_type == "SELSKAP"):
+            ratio_parts, ratio_ids, ratio_derived = [], [], {}
+            revenue = (latest.get("revenue") or {}).get("value")
+            operating = (latest.get("operating_result") or {}).get("value")
+            equity = (latest.get("equity") or {}).get("value")
+            assets = (latest.get("total_assets") or {}).get("value")
+            if revenue and operating is not None and revenue > 0:
+                margin = round(operating / revenue * 100, 1)
+                ratio_parts.append(f"an operating margin of {margin}%")
+                ratio_derived["margin"] = margin
+                ratio_ids += [latest["revenue"]["claim_id"], latest["operating_result"]["claim_id"]]
+            if assets and equity is not None and assets > 0:
+                eq_ratio = round(equity / assets * 100, 1)
+                ratio_parts.append(f"an equity ratio of {eq_ratio}%")
+                ratio_derived["equity_ratio"] = eq_ratio
+                ratio_ids += [latest["equity"]["claim_id"], latest["total_assets"]["claim_id"]]
+            if ratio_parts:
+                ratio_derived["year"] = float(latest["year"])
+                s.append(_sentence(f"That gives {_join(ratio_parts)} for {latest['year']} (computed from the cited figures).",
+                                   ratio_ids, ratio_derived))
         if "equity" in latest and latest["equity"]["value"] < 0 and not (has_group and account_type == "SELSKAP"):
             s.append(_sentence("Equity is negative in the latest filed accounts, a point to check before extending credit.",
                                [latest["equity"]["claim_id"]]))

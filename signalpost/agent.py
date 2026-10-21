@@ -123,6 +123,7 @@ class Agent:
                                aliases=[h.get("navn") for h in entity.get("historiskeNavn") or [] if h.get("navn")],
                                other_addresses=[(u["street"], u["postcode"]) for u in work.subunits if u.get("street") and u.get("postcode")],
                                brands=self._subunit_brands(name, work.subunits),
+                               people=[p["name"] for p in work.people if p.get("name")],
                                employees=entity.get("antallAnsatte"), revenue=revenue,
                                industry=(entity.get("naeringskode1") or {}).get("kode", ""))
 

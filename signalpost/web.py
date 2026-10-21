@@ -151,6 +151,7 @@ class Company:
     postcode: str = ""
     other_addresses: list[tuple[str, str]] = field(default_factory=list)
     brands: list[str] = field(default_factory=list)
+    people: list[str] = field(default_factory=list)
     city: str = ""
     aliases: list[str] = field(default_factory=list)
     employees: int | None = None
@@ -563,6 +564,43 @@ def _initials(text: str) -> str:
     return "".join(w[0] for w in words).lower() if len(words) >= 2 else ""
 
 
+FOREIGN_FORMS = {"ag", "gmbh", "ab", "oy", "oyj", "aps", "ltd", "limited", "inc", "llc", "plc", "bv", "nv", "sarl", "srl", "as", "asa"}
+GROUP_WORDS = {"group", "gruppen", "konsern", "konsernet", "holding"}
+
+
+def acceptable_brand(brand: str, company: Company, site_host: str) -> bool:
+    """A public brand must be short, not the legal name itself, not a domain, not a person registered in a role,
+    and must not name a *different* legal entity (e.g. 'Knut Hovet AS' on the site of 'KNUT HOVET INSTALLASJONAR AS')."""
+    text = brand.strip()
+    folded = fold(text)
+    if not (2 <= len(text) <= 40) or folded == fold(company.name) or re.search(r"(www\.|https?:|\.(no|com|net|org)\b|scroll|meny|menu|cookie)",
+                                                                             folded):
+        return False
+    toks = tokens(text)
+    if toks and toks[-1] in {"as", "asa", "sa", "da", "ans", "ag", "gmbh", "ab", "ltd", "inc"} and toks != tokens(company.name):
+        return False
+    if fold(text) in {fold(p) for p in company.people}:
+        return False
+    label = domain_key(registrable(site_host).split(".")[0])
+    shared = set(distinctive(name_tokens(text))) & (set(distinctive(company.core)) | {t for t in [label] if len(t) >= 3})
+    return bool(shared) or domain_key(text) in label or label in domain_key(text)
+
+
+def foreign_entity_handle(company: Company, url: str) -> bool:
+    """Handles such as 'wyssen-avalanche-control-ag' or 'lindbak-gruppen-as' name another legal entity (parent/group)."""
+    segment = urllib.parse.unquote(urllib.parse.urlsplit(url).path).strip("/").split("/")[-1]
+    parts = [p for p in re.split(r"[-_.]+", fold(segment)) if p]
+    if len(parts) < 2:
+        return False
+    if parts[-1] in FOREIGN_FORMS - {"as", "asa"}:
+        return True
+    stem = set(parts[:-1] if parts[-1] in {"as", "asa"} else parts)
+    own_names = [set(company.core)] + [set(name_tokens(n)) for n in company.aliases + company.brands if name_tokens(n)]
+    if parts[-1] in {"as", "asa"} and not any(names and names <= stem for names in own_names):
+        return True
+    return bool((stem & GROUP_WORDS) - set().union(*own_names))
+
+
 def handle_matches(company: Company, url: str, brand: str | None, site_host: str) -> bool:
     """Does the profile handle name the company (legal name, former names, brand, workplace brands, domain, initials)?"""
     parts = urllib.parse.urlsplit(url)
@@ -640,7 +678,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
             if compact and len(compact) >= 3 and (compact in label or label in compact) and len(piece) <= 60:
                 brand, span = piece, f"[title] {home.title}"
                 break
-    if brand and span and len(brand) <= 80 and fold(brand) != fold(company.name) and not brand.lower().startswith(("www.", "http")):
+    if brand and span and acceptable_brand(brand, company, site_host):
         claim = ledger.text_claim(home_doc, span, "identity", "public_brand", brand, confidence=0.9, method="site_metadata")
         if claim:
             out["brand"] = brand
@@ -677,7 +715,8 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     for platform, items in by_platform.items():
         # A readable handle must name the company (or its brand/domain); opaque numeric/channel ids are accepted only
         # when they are the site's single link for that platform. Owners' personal pages and parent-group profiles fail this.
-        matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)]
+        matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)
+                    and not foreign_entity_handle(company, i["url"])]
         opaque = [i for i in items if opaque_handle(i["url"]) and i not in matching]
         keep = matching[:2] if matching else (opaque[:1] if len(items) == 1 else [])
         for item in keep:
@@ -688,11 +727,12 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
                 span = raw_json[:500] if raw_json and item["raw"] in raw_json[:500] else None
             if not span:
                 continue
-            claim = ledger.text_claim(doc, span, "website", "social_profile", item["url"] if item["raw"].rstrip("/").lower().endswith(
-                urllib.parse.urlsplit(item["url"]).path.rstrip("/").lower()) else item["raw"], qualifier=platform,
-                display=f"{platform.title()}: {item['url']}", confidence=0.93 if handle_matches(company, item["url"], out["brand"], site_host) else 0.85,
-                method="verified_site_outbound_link", extra={"platform": platform, "normalized_url": item["url"],
-                                                             "handle_matches_name": handle_matches(company, item["url"], out["brand"], site_host)})
+            named = handle_matches(company, item["url"], out["brand"], site_host)
+            # value = the link exactly as printed on the verified site; the canonical form is kept for matching/dedupe
+            claim = ledger.text_claim(doc, span, "website", "social_profile", item["raw"].strip(), qualifier=f"{platform}:{item['url']}",
+                                      display=f"{platform.title() if platform != 'x' else 'X'}: {item['url']}", confidence=0.93 if named else 0.85,
+                                      method="verified_site_outbound_link",
+                                      extra={"platform": platform, "normalized_url": item["url"], "handle_matches_name": named})
             if claim:
                 out["profiles"].append({"platform": platform, "url": item["url"], "claim_id": claim["id"]})
     # careers pages and applicant-tracking portals linked from the site

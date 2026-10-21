@@ -118,6 +118,15 @@ def entity_claims(ledger: Ledger, result: FetchResult) -> tuple[str, dict[str, A
                           effective_at=(item.get("tilDato") or "")[:10] or None,
                           extra={"valid_from": (item.get("fraDato") or "")[:10] or None, "valid_to": (item.get("tilDato") or "")[:10] or None})
     ledger.json_claim(doc, "/sisteInnsendteAarsregnskap", s, "latest_filed_accounts_year")
+    for key, field_name in (("registreringsdatoForetaksregisteret", "business_register_date"),
+                            ("registreringsdatoMerverdiavgiftsregisteret", "vat_register_date"),
+                            ("vedtektsdato", "articles_date")):
+        if data.get(key):
+            ledger.json_claim(doc, f"/{key}", s, field_name, effective_at=data[key])
+    if capital.get("antallAksjer") is not None:
+        ledger.json_claim(doc, "/kapital/antallAksjer", s, "number_of_shares", display=f"{capital['antallAksjer']:,} shares")
+    if data.get("maalform"):
+        ledger.json_claim(doc, "/maalform", s, "official_language_form")
     ledger.json_claim(doc, "/institusjonellSektorkode/beskrivelse", s, "institutional_sector")
     if data.get("epostadresse"):
         ledger.json_claim(doc, "/epostadresse", s, "registered_email")
@@ -145,6 +154,15 @@ ACCOUNT_FIELDS = (
     ("cash", "/eiendeler/sumBankinnskuddOgKontanter", "Cash and bank deposits"),
     ("equity", "/egenkapitalGjeld/egenkapital/sumEgenkapital", "Equity"),
     ("debt", "/egenkapitalGjeld/gjeldOversikt/sumGjeld", "Total debt"),
+    ("operating_costs", "/resultatregnskapResultat/driftsresultat/driftskostnad/sumDriftskostnad", "Operating costs"),
+    ("sales_revenue", "/resultatregnskapResultat/driftsresultat/driftsinntekter/salgsinntekter", "Sales revenue"),
+    ("net_financial_items", "/resultatregnskapResultat/finansresultat/nettoFinans", "Net financial items"),
+    ("current_assets", "/eiendeler/omloepsmidler/sumOmloepsmidler", "Current assets"),
+    ("fixed_assets", "/eiendeler/anleggsmidler/sumAnleggsmidler", "Fixed assets"),
+    ("receivables", "/eiendeler/sumFordringer", "Receivables"),
+    ("inventory", "/eiendeler/sumVarer", "Inventory"),
+    ("short_term_debt", "/egenkapitalGjeld/gjeldOversikt/kortsiktigGjeld/sumKortsiktigGjeld", "Short-term debt"),
+    ("long_term_debt", "/egenkapitalGjeld/gjeldOversikt/langsiktigGjeld/sumLangsiktigGjeld", "Long-term debt"),
 )
 
 

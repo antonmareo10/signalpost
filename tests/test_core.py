@@ -17,8 +17,9 @@ from signalpost.ledger import Document, Ledger, canonical_json, supports  # noqa
 from signalpost.nav import NavJobs  # noqa: E402
 from signalpost.refresh import diff  # noqa: E402
 from signalpost.synth import build_summary, check_sentence  # noqa: E402
-from signalpost.web import (Candidate, Company, SiteResearcher, address_on_page, candidate_slugs, handle_matches,  # noqa: E402
-                            legal_name_hit, name_tokens, normalize_social, opaque_handle, valid_orgnr)
+from signalpost.web import (Candidate, Company, SiteResearcher, acceptable_brand, address_on_page, candidate_slugs,  # noqa: E402
+                            foreign_entity_handle, handle_matches, legal_name_hit, name_tokens, normalize_social, opaque_handle,
+                            valid_orgnr)
 
 
 def json_doc(data, url="https://data.brreg.no/enhetsregisteret/api/enheter/810034882"):
@@ -122,6 +123,19 @@ class SocialTests(unittest.TestCase):
         self.assertFalse(handle_matches(Company(org="1", name="FJELLHEIMEN GALLERI AS"), "https://www.instagram.com/orsolyahaarberg",
                                         None, "fjellheimengalleri.no"))
         self.assertTrue(opaque_handle("https://www.facebook.com/profile.php?id=100057441009551"))
+
+    def test_parent_or_group_handles_are_not_the_company(self):
+        self.assertTrue(foreign_entity_handle(Company(org="1", name="LINDBAK IT AS"), "https://www.linkedin.com/company/lindbak-gruppen-as"))
+        self.assertTrue(foreign_entity_handle(Company(org="1", name="WYSSEN NORGE AS"),
+                                              "https://www.linkedin.com/company/wyssen-avalanche-control-ag"))
+        self.assertFalse(foreign_entity_handle(Company(org="1", name="AF GRUPPEN ASA"), "https://www.linkedin.com/company/af-gruppen"))
+        self.assertFalse(foreign_entity_handle(Company(org="1", name="ENTRA ASA", aliases=["ENTRA EIENDOM AS"]),
+                                               "https://www.linkedin.com/company/entra-eiendom-as"))
+
+    def test_brand_rules(self):
+        self.assertFalse(acceptable_brand("Knut Hovet AS", Company(org="1", name="KNUT HOVET INSTALLASJONAR AS"), "hovet.com"))
+        self.assertFalse(acceptable_brand("Mats Carlin", Company(org="1", name="CARLIN INVEST AS", people=["Mats Carlin"]), "carlin.no"))
+        self.assertTrue(acceptable_brand("AF Gruppen", Company(org="1", name="AF GRUPPEN ASA"), "afgruppen.no"))
 
 
 class HtmlTests(unittest.TestCase):
