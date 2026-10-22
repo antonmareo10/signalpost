@@ -387,18 +387,27 @@ class _Pacer:
         if delay > 0:
             time.sleep(delay)
 
+    def cooldown(self, seconds: float) -> None:
+        """Push every caller's next slot back: the endpoint said the budget is spent."""
+        with self._lock:
+            self._next = max(self._next, time.monotonic() + seconds)
 
-COPY_PACER = _Pacer(0.25)  # ~4 requests/s: the copies endpoint allows ~30 per window per server; measured safe at 5/s
+
+# The copies endpoint grants a burst of ~30 requests per server and refills slowly; measured on 22 Oct 2026 a 1,000-company
+# run at 4/s drew 98 refusals (HTTP 429), so the sustained pace is ~1.4/s from one dedicated thread, with a shared cool-down.
+COPY_PACER = _Pacer(0.7)
 
 
-def fetch_account_copies(fetcher: Fetcher, org: str) -> FetchResult:
+def fetch_account_copies(fetcher: Fetcher, org: str, attempts: int = 6, deadline: float | None = None) -> FetchResult:
     result = None
-    for attempt in range(3):
+    for attempt in range(attempts):
         COPY_PACER.wait()
         result = fetcher.get(COPIES.format(org=org), accept="application/json", retries=0)
         if result.status != 429:
             return result
-        time.sleep(4 + 4 * attempt)  # budget window exhausted: wait for it to refill
+        if deadline is not None and time.monotonic() > deadline:
+            break
+        COPY_PACER.cooldown(15 + 5 * attempt)  # budget spent: let it refill before anyone asks again
     return result  # type: ignore[return-value]
 
 

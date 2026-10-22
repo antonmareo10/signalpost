@@ -161,6 +161,8 @@ def build_report(envelopes: list[dict[str, Any]], agent: Agent, args: argparse.N
                        "search_calls": agent.search.calls if agent.search else 0,
                        "nav_feed": {"state": agent.nav.state, "pages": agent.nav.feed_pages, "active_ads": len(agent.nav.active),
                                     "matched_companies": len(agent.nav.by_org), "error": agent.nav.error},
+                       "annual_account_copies": {"lists_fetched": sum(1 for r in agent.copies.values() if r is not None and r.ok),
+                                                 "companies": n, "paced_wait_cap_seconds": agent.copies_wait_s},
                        "top_hosts": dict(Counter(agent.fetcher.stats.by_host).most_common(8))},
         "validation": {"passed": all(validation.values()), "checks": validation},
     }

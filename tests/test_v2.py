@@ -64,6 +64,28 @@ class AccountCopiesTests(unittest.TestCase):
         self.assertEqual(account_copy_claims(Ledger(ORG), fetched("u", []), ORG)[0], "not_available")
         self.assertEqual(account_copy_claims(Ledger(ORG), fetched("u", {}, status=429), ORG)[0], "blocked")
 
+    def test_refusal_cools_down_and_retries(self):
+        from signalpost import registry
+        answers = [fetched("u", {}, status=429), fetched("u", ["2025"])]
+        cooldowns = []
+
+        class FakeFetcher:
+            def get(self, url, **kwargs):
+                return answers.pop(0)
+
+        class FastPacer(registry._Pacer):
+            def cooldown(self, seconds):
+                cooldowns.append(seconds)
+
+        original = registry.COPY_PACER
+        registry.COPY_PACER = FastPacer(0.0)
+        try:
+            result = registry.fetch_account_copies(FakeFetcher(), ORG)
+        finally:
+            registry.COPY_PACER = original
+        self.assertEqual(result.status, 200)
+        self.assertEqual(len(cooldowns), 1)
+
 
 class RegisterHistoryTests(unittest.TestCase):
     def test_dated_events_with_details_only_within_window(self):

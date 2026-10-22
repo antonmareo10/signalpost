@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import re
 import threading
 import time
@@ -70,6 +71,12 @@ class Agent:
         self.started_at = utc_now()
         self.today = datetime.now(timezone.utc).date().isoformat()
         self.industry_labels = IndustryLabels(self.fetcher, self.today)
+        self.copies: dict[str, Any] = {}
+        self.copies_done = False
+        self.copies_stop = threading.Event()
+        # Extra time the batch may wait for the paced copies list after every other phase is done (the endpoint sustains
+        # under one request per second); whatever is not reached is reported per company, never shown as "no documents".
+        self.copies_wait_s = float(os.environ.get("SIGNALPOST_COPIES_WAIT_SECONDS", "300"))
         self._errors: dict[str, list[dict[str, Any]]] = {}
         self._elapsed: dict[str, float] = {}
         self._errors_lock = threading.Lock()
@@ -212,12 +219,6 @@ class Agent:
         company = work.company
         assert company is not None
         ledger = work.ledger
-        if self.remaining() > 40 and work.states.get("accounts") == "available":
-            copies = fetch_account_copies(self.fetcher, work.org)
-            copies_state, _ = account_copy_claims(ledger, copies, work.org)
-            if copies_state in ("failed", "blocked"):
-                work.errors.append({"section": "accounts", "source": copies.url,
-                                    "error": f"annual-account copies list: {copies.error or 'HTTP ' + str(copies.status)}"})
         verified = None
         extra_sites: list[Any] = []
         related = None
@@ -329,6 +330,8 @@ class Agent:
         works = {org: Work(org, Ledger(org)) for org in orgs}
         nav_thread = threading.Thread(target=self._load_nav, daemon=True)
         nav_thread.start()
+        copies_thread = threading.Thread(target=self._load_copies, args=(list(orgs),), daemon=True)
+        copies_thread.start()
         self.log(f"[phase A] official registers for {len(orgs)} companies")
         self._parallel(orgs, lambda org: self.official(works[org], (bulk or {}).get(org)), "official")
         nav_thread.join(timeout=max(5, min(260, self.remaining() - 120)))
@@ -347,10 +350,26 @@ class Agent:
         self.log("[phase C] websites, profiles, jobs and activity")
         self._parallel([o for o in orgs if works[o].company], lambda org: self.footprint(works[org]), "footprint")
         self._dedupe_shared_profiles(works)
+        if copies_thread.is_alive():
+            self.log(f"[phase D] waiting for the paced annual-account copies list ({len(self.copies)}/{len(orgs)} so far)")
+            copies_thread.join(timeout=max(0.0, min(self.remaining() - 40, self.copies_wait_s)))
+        self.copies_stop.set()
         envelopes = []
         for org in orgs:
             envelopes.append(self.envelope(works[org], (previous or {}).get(org), previous_run_id))
         return envelopes
+
+    def _load_copies(self, orgs: list[str]) -> None:
+        """Annual-account copies come from an endpoint with a small request budget, so one paced thread asks for them while
+        the other phases run; refusals cool everyone down and are retried, and anything left is reported, never zeroed."""
+        try:
+            for org in orgs:
+                if self.remaining() < 45 or self.copies_stop.is_set():
+                    return
+                self.copies[org] = fetch_account_copies(self.fetcher, org, deadline=self.deadline - 60)
+            self.copies_done = True
+        except Exception as exc:  # never let this source break the batch
+            self.log(f"annual-account copies thread stopped: {type(exc).__name__}: {exc}")
 
     def _load_nav(self) -> None:
         try:
@@ -401,6 +420,14 @@ class Agent:
     # -- envelope ----------------------------------------------------------------------------------------
     def envelope(self, work: Work, previous: dict[str, Any] | None, previous_run_id: str | None) -> dict[str, Any]:
         ledger = work.ledger
+        copies = self.copies.get(work.org)
+        if copies is not None:
+            copies_state, _ = account_copy_claims(ledger, copies, work.org)
+            if copies_state in ("failed", "blocked"):
+                work.errors.append({"section": "accounts", "source": copies.url,
+                                    "error": f"annual-account copies list: {copies.error or 'HTTP ' + str(copies.status)}"})
+        elif work.company is not None:
+            work.errors.append({"section": "accounts", "error": "annual-account copies list not reached within the time budget"})
         errors = work.errors + self._errors.get(work.org, [])
         for section in SECTIONS:
             work.states.setdefault(section, "failed" if errors else "not_available")

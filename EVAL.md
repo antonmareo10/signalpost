@@ -1,7 +1,36 @@
-# Evaluation (local, 21 Oct 2026)
+# Evaluation (local, 21–22 Oct 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.1.0 (22 Oct): what changed, measured on the same 100 companies the same day
+
+Both versions were run on `samples/smoke-100.jsonl` on 22 Oct 2026, keyless.
+
+| Family | v1.0.0: companies / facts | v1.1.0: companies / facts |
+|---|---|---|
+| Verified website | 8 / 8 | 8 / 8 |
+| Company-owned social profiles | 3 / 5 | 3 / 5 |
+| Job ads or careers page | 1 / 1 | 1 / 1 |
+| Accounts figures (revenue, net result, equity) | 100 / 753 | 100 / 753 |
+| Roles / workplaces | 100 / 383 · 74 / 77 | 100 / 383 · 74 / 77 |
+| **Official PDF copy of each filed year (new)** | 0 / 0 | **100 / 909** |
+| **Dated register history events (new)** | 0 / 0 | **100 / 187** |
+| **Register employee-count history (new)** | 0 / 0 | **9 / 39** |
+| **Official English industry label (new)** | 0 / 0 | **91 / 91** (the other 9 are registered as "00.000 unspecified") |
+| Summary sentences per company (mean) | 8.1 | 13.2, in five labelled parts; 0 dropped by the number check |
+| Companies with a dated "what changed" statement beyond the role-change date | 0 | 100 |
+| Companies with at least one cited signal | 0 | 73 |
+
+Evidence audit (`eval/audit_evidence.py`) on the v1.1.0 smoke run: 9,344 / 9,344 excerpts re-found in their stored
+snapshots. A second run on the same day: 0 changes, 0 carried-forward claims (idempotent refresh holds for the new
+families too). Unit tests: 35 offline tests.
+
+Website discovery: "A/S" and "A.S.A." are now stripped as legal forms, and names with a connector word are also tried
+with it ("Nesset og Eidem" → nessetogeidem.no). On the 27 such companies of the 1,000-company batch this found one more
+verified website (organisation number printed on the site) and changed no rejection. A Wikidata lookup by
+organisation number (property P2333) was measured and not added: 8 of 500 sample companies have an item, and the
+agent already finds 5 of the 7 websites listed there; the other two are a group site and a municipality page.
 
 ## Contract and evidence
 
