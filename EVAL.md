@@ -17,10 +17,11 @@ Same 1,000 random companies as the scale test below (seed 1000), 1.1.0 and 1.2.0
 | Wall clock | 1,940 s (this run; 775 s an hour earlier) | 964 s (877 s an hour earlier) |
 
 Validation passed on both. 15 websites gained and 2 removed, all reviewed by hand:
-- **Gained (15):** 14 small active companies that were never guessed before (no registered employees, NOK 100k–1M
-  revenue), and one site that only answers on `www`. Proof on the site: the organisation number for 11, the legal
-  name with the registered address or phone for 3, the exact legal name for 1 (Spellplassen AS, whose site prints its
-  organisation number with two digits swapped).
+- **Gained (15):** all 15 are small active companies that were never guessed before (no registered employees, NOK
+  100k–1M revenue). Proof on the site: the organisation number for 11, the legal name with the registered address or
+  phone for 3, the exact legal name for 1 (Spellplassen AS, whose site prints its organisation number with two digits
+  swapped). The `www`/apex retry reached three more sites in this batch (bartho.no, volvomaskinservice.no,
+  kriss-consulting.com); none of them proves it belongs to the company, so none is published.
 - **Removed (2), now `not_available`:** legentic.com for LEGENTIC SERVICES AS (the domain only matches "Legentic", which
   five other registered companies share: a group site) and lekeplassmontorene.no (the web host's default page, "This
   domain is hosted by NordkappNett AS").
