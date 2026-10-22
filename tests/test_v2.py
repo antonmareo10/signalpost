@@ -154,6 +154,27 @@ class SummaryV2Tests(unittest.TestCase):
         self.assertFalse(check_sentence({"text": "Registered employees fell from 60 to 5.", "claim_ids": [], "derived": {}}, ledger))
 
 
+class NameVariantTests(unittest.TestCase):
+    def test_a_slash_s_is_a_legal_form(self):
+        from signalpost.web import name_tokens
+        self.assertEqual(name_tokens("Rønnings Bilverksted A/S"), ["ronnings", "bilverksted"])
+        self.assertEqual(name_tokens("A/S NORSK STAL"), ["norsk", "stal"])
+        self.assertEqual(name_tokens("AAS ELEKTRONIKK AS"), ["aas", "elektronikk"])
+
+    def test_connector_variant_is_tried_and_counts_as_named_after_the_company(self):
+        from signalpost.web import Candidate, Company, SiteResearcher, candidate_slugs
+        company = Company(org="923884149", name="NESSET OG EIDEM AS")
+        self.assertEqual(candidate_slugs(company)[:2], ["nessetogeidem", "nesset-og-eidem"])
+        proof = {"orgnr": None, "other_orgnrs": [], "phone": {"url": "u"}, "email": None, "address": None, "name_identity": {"url": "u"},
+                 "name_anywhere": None, "domain_name": None, "legal_name_exact": None, "norwegian_context": True}
+        researcher = SiteResearcher(fetcher=None)  # type: ignore[arg-type]
+        researcher._name_unique = lambda c: False  # type: ignore[assignment]
+        state, _, _ = researcher._decide(company, Candidate("https://x", "domain_guess_from_legal_name", "weak"), dict(proof), "nessetogeidem.no")
+        self.assertEqual(state, "verified")
+        state, _, _ = researcher._decide(company, Candidate("https://x", "domain_guess_from_legal_name", "weak"), dict(proof), "eidem.no")
+        self.assertEqual(state, "rejected")  # a partial name is still not "named after the company"
+
+
 class ViewerTests(unittest.TestCase):
     def test_site_embeds_parts_signals_and_documents(self):
         ledger = SummaryV2Tests().build()

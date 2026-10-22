@@ -122,14 +122,30 @@ def normalize_site_url(value: str | None) -> str | None:
     return value
 
 
+def _strip_forms(toks: list[str]) -> list[str]:
+    toks = list(toks)
+    changed = True
+    while changed and toks:
+        changed = False
+        if toks[-3:] == ["a", "s", "a"]:  # "A.S.A." written with separators
+            toks, changed = toks[:-3], True
+        elif toks[-2:] == ["a", "s"]:  # "A/S"
+            toks, changed = toks[:-2], True
+        elif toks[-1] in LEGAL_FORMS:
+            toks, changed = toks[:-1], True
+    while toks[:2] == ["a", "s"] or (toks and toks[0] in LEGAL_FORMS):
+        toks = toks[2:] if toks[:2] == ["a", "s"] else toks[1:]
+    return toks
+
+
 def name_tokens(name: str) -> list[str]:
     """Legal-name tokens without the legal-form suffix/prefix (only at the ends) and connector words."""
-    toks = tokens(name)
-    while toks and toks[-1] in LEGAL_FORMS:
-        toks = toks[:-1]
-    while toks and toks[0] in LEGAL_FORMS:
-        toks = toks[1:]
-    return [t for t in toks if t not in CONNECTORS]
+    return [t for t in _strip_forms(tokens(name)) if t not in CONNECTORS]
+
+
+def name_tokens_with_connectors(name: str) -> list[str]:
+    """Like name_tokens but keeps inner connector words ("Nesset og Eidem" is often nessetogeidem.no)."""
+    return [t for t in _strip_forms(tokens(name)) if t != "&"]
 
 
 def domain_key(text: str) -> str:
@@ -198,6 +214,11 @@ def candidate_slugs(company: Company) -> list[str]:
         return []
     joined = "".join(toks)
     out = []
+    full = name_tokens_with_connectors(company.name)
+    if full != toks and 2 <= len(full) <= 5 and any(t in CONNECTORS for t in full[1:-1]):
+        with_connectors = "".join(full).replace("aa", "a")
+        if 6 <= len(with_connectors) <= 40:
+            out += [with_connectors, "-".join(t.replace("aa", "a") for t in full)]
     if 4 <= len(joined) <= 40:
         variants = [joined.replace("aa", "a"), joined] if "aa" in joined else [joined]
         for variant in variants:
@@ -400,8 +421,10 @@ class SiteResearcher:
         label = domain_key(registrable(final_host).split(".")[0])
         core = company.core
         joined = domain_key("".join(core))
+        joined_full = domain_key("".join(name_tokens_with_connectors(company.name)))
         dist = [domain_key(t) for t in distinctive(core)]
         domain_name = bool(joined and (label == joined or (len(joined) >= 6 and joined in label))) or \
+            bool(joined_full and len(joined_full) >= 6 and label == joined_full) or \
             bool(dist and all(t in label for t in dist) and sum(len(t) for t in dist) >= 5)
         proof["domain_name"] = domain_name
         contact = proof["phone"] or proof["email"] or proof["address"]
