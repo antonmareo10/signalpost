@@ -24,6 +24,8 @@ FAMILIES = {
     "official_website": "website", "social_profile": "company_profiles", "job_posting": "jobs", "careers_page": "jobs",
     "website_post": "dated_activity", "role": "leadership", "workplace": "workplaces", "revenue": "annual_accounts",
     "legal_name": "identity", "website_description": "description", "public_brand": "brand",
+    "annual_accounts_copy": "annual_account_documents", "registry_update": "register_history", "industry_en": "industry_label_en",
+    "registry_role_change": "register_history", "employees_history": "register_history",
 }
 
 

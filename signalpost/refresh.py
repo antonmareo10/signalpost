@@ -15,7 +15,11 @@ MULTI = {"role": ("new_role", "removed_role"), "workplace": ("new_location", "cl
          "job_posting": ("new_job", "closed_job"), "social_profile": ("new_profile", "removed_profile"),
          "website_post": ("new_post", None), "accounting_period": ("new_filing", None), "group_subsidiary": ("new_subsidiary", "removed_subsidiary"),
          "careers_page": ("new_careers_page", "removed_careers_page"), "former_name": ("name_history_added", None),
-         "registry_role_change": ("role_register_updated", None), "secondary_industry": ("industry_added", "industry_removed")}
+         "registry_role_change": ("role_register_updated", None), "secondary_industry": ("industry_added", "industry_removed"),
+         "registry_update": ("register_event", None), "employees_history": ("employee_count_event", None),
+         "accounts_filed_event": ("filing_event", None), "annual_accounts_copy": ("new_accounts_document", None),
+         "industry_en": ("industry_label_added", "industry_label_removed"),
+         "secondary_industry_en": ("industry_label_added", "industry_label_removed")}
 HIGH = {"legal_name", "business_address", "official_website", "bankrupt", "under_liquidation", "forced_dissolution", "group_parent",
         "accounting_period", "legal_form"}
 HIGH_ROLES = {"DAGL", "LEDE"}

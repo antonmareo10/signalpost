@@ -8,6 +8,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
+import threading
+import time
+from datetime import date, timedelta
 from typing import Any
 
 from .ledger import Document, Ledger, canonical_json
@@ -18,6 +22,12 @@ ROLES = "https://data.brreg.no/enhetsregisteret/api/enheter/{org}/roller"
 SUBUNITS = "https://data.brreg.no/enhetsregisteret/api/underenheter?overordnetEnhet={org}&size=200"
 GROUP = "https://data.brreg.no/enhetsregisteret/api/konsernstruktur/{org}"
 ACCOUNTS = "https://data.brreg.no/regnskapsregisteret/regnskap/{org}"
+COPIES = "https://data.brreg.no/regnskapsregisteret/regnskap/aarsregnskap/kopi/{org}/aar"
+COPY_PDF = "https://data.brreg.no/regnskapsregisteret/regnskap/aarsregnskap/kopi/{org}/{year}"
+UPDATES = ("https://data.brreg.no/enhetsregisteret/api/oppdateringer/enheter?organisasjonsnummer={org}"
+           "&dato={since}T00:00:00.000Z&size=100&includeChanges=true")
+KLASS_NACE = "https://data.ssb.no/api/klass/v1/classifications/6/codes?from={day}&language=en"
+KLASS_NACE_2007 = "https://data.ssb.no/api/klass/v1/classifications/6/codes?from=2020-01-01&to=2024-12-31&language=en"
 
 ROLE_LABELS = {
     "DAGL": "Chief executive (daglig leder)", "LEDE": "Chair of the board", "NEST": "Deputy chair", "MEDL": "Board member",
@@ -358,3 +368,180 @@ def group_claims(ledger: Ledger, result: FetchResult, org: str) -> tuple[str, di
 
     walk(root, "", [])
     return ("available" if found["parents"] or found["subsidiaries"] else "not_available"), found
+
+
+# -- annual-account copies (official PDFs held by Regnskapsregisteret) -------------------------------------------
+class _Pacer:
+    """Spaces calls to an endpoint that publishes a small per-window request budget (``x-rate-limit-remaining``)."""
+
+    def __init__(self, interval: float) -> None:
+        self.interval = interval
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def wait(self) -> None:
+        with self._lock:
+            slot = max(time.monotonic(), self._next)
+            self._next = slot + self.interval
+        delay = slot - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+
+
+COPY_PACER = _Pacer(0.25)  # ~4 requests/s: the copies endpoint allows ~30 per window per server; measured safe at 5/s
+
+
+def fetch_account_copies(fetcher: Fetcher, org: str) -> FetchResult:
+    result = None
+    for attempt in range(3):
+        COPY_PACER.wait()
+        result = fetcher.get(COPIES.format(org=org), accept="application/json", retries=0)
+        if result.status != 429:
+            return result
+        time.sleep(4 + 4 * attempt)  # budget window exhausted: wait for it to refill
+    return result  # type: ignore[return-value]
+
+
+def account_copy_claims(ledger: Ledger, result: FetchResult, org: str) -> tuple[str, list[dict[str, Any]]]:
+    """Years for which the register holds a copy of the filed annual accounts, each with its official PDF URL."""
+    state = _state_for(result)
+    if state != "available":
+        return state, []
+    doc = _document(result, "official_annual_account_copies")
+    years = doc.data if isinstance(doc.data, list) else []
+    out = []
+    order = sorted(range(len(years)), key=lambda i: str(years[i]), reverse=True)
+    for index in order[:20]:
+        year = str(years[index])
+        if not re.fullmatch(r"\d{4}", year):
+            continue
+        claim = ledger.json_claim(doc, f"/{index}", "accounts", "annual_accounts_copy", value=year, qualifier=year,
+                                  display=f"Annual accounts {year}: official copy (PDF) held by the Register of Company Accounts",
+                                  extra={"year": year, "url": COPY_PDF.format(org=org, year=year), "document_type": "annual_accounts_pdf"})
+        if claim:
+            out.append(claim)
+    return ("available" if out else "not_available"), out
+
+
+# -- dated register history (Enhetsregisteret update feed, filtered to this organisation number) --------------------
+UPDATE_LABELS = {
+    "navn": "name", "organisasjonsform": "legal form", "forretningsadresse": "business address", "postadresse": "postal address",
+    "naeringskode1": "industry code", "naeringskode2": "secondary industry code", "naeringskode3": "secondary industry code",
+    "antallAnsatte": "employee count", "hjemmeside": "website", "epostadresse": "e-mail address", "telefon": "phone number",
+    "mobil": "mobile number", "sisteInnsendteAarsregnskap": "latest filed annual accounts", "kapital": "share capital",
+    "vedtektsfestetFormaal": "statutory purpose", "aktivitet": "registered activity", "vedtektsdato": "articles of association",
+    "registrertIMvaregisteret": "VAT registration", "registrertIForetaksregisteret": "business-register entry",
+    "konkurs": "bankruptcy status", "underAvvikling": "liquidation status",
+    "underTvangsavviklingEllerTvangsopplosning": "compulsory dissolution status", "erIKonsern": "group membership",
+    "institusjonellSektorkode": "institutional sector", "stiftelsesdato": "founding date", "slettedato": "deletion",
+    "registrertIFrivillighetsregisteret": "voluntary-organisation register entry", "registrertIStiftelsesregisteret": "foundation register entry",
+    "overordnetEnhet": "parent unit", "maalform": "official language form", "historiskeNavn": "former names",
+    "registreringsdatoForetaksregisteret": "business-register date", "registreringsdatoMerverdiavgiftsregisteret": "VAT-register date",
+}
+SKIP_UPDATE_FIELDS = {"registreringsdatoAntallAnsatteEnhetsregisteret", "registreringsdatoAntallAnsatteNAVAaregisteret",
+                      "harRegistrertAntallAnsatte", "hjelpeenhetskode", "_links", "links", "respons_klasse"}
+
+
+def fetch_updates(fetcher: Fetcher, org: str, today: str, months: int = 26) -> FetchResult:
+    since = (date.fromisoformat(today) - timedelta(days=int(months * 30.5))).isoformat()
+    return fetcher.get(UPDATES.format(org=org, since=since), accept="application/json", retries=1)
+
+
+def update_claims(ledger: Ledger, result: FetchResult, today: str, months: int = 24, limit: int = 12) -> tuple[str, list[dict[str, Any]]]:
+    """Dated changes the register recorded for this entity (what changed, when), newest first."""
+    state = _state_for(result)
+    if state != "available":
+        return state, []
+    doc = _document(result, "official_registry_updates")
+    items = ((doc.data or {}).get("_embedded") or {}).get("oppdaterteEnheter") or []
+    cutoff = (date.fromisoformat(today) - timedelta(days=int(months * 30.5))).isoformat()
+    events: list[dict[str, Any]] = []
+    order = sorted(range(len(items)), key=lambda i: items[i].get("dato") or "", reverse=True)
+    for index in order:
+        item = items[index]
+        changes = item.get("endringer") or []
+        day = (item.get("dato") or "")[:10]
+        if not changes or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or day < cutoff:
+            continue
+        fields: list[str] = []
+        for change in changes:
+            root = (change.get("path") or "").strip("/").split("/")[0]
+            if root and root not in SKIP_UPDATE_FIELDS and root not in fields:
+                fields.append(root)
+        if not fields:
+            continue
+        labels = list(dict.fromkeys(UPDATE_LABELS.get(f, f) for f in fields))
+        base = f"/_embedded/oppdaterteEnheter/{index}"
+        for j, change in enumerate(changes):
+            path, value = change.get("path") or "", change.get("value")
+            if change.get("op") not in ("replace", "add"):
+                continue
+            if path == "/antallAnsatte" and isinstance(value, int) and not isinstance(value, bool):
+                ledger.json_claim(doc, f"{base}/endringer/{j}", "activity", "employees_history", value=value, qualifier=day,
+                                  effective_at=day, display=f"Registered employee count set to {value} on {day}",
+                                  extra={"event_date": day})
+            elif path == "/sisteInnsendteAarsregnskap" and value and re.fullmatch(r"\d{4}", str(value)):
+                ledger.json_claim(doc, f"{base}/endringer/{j}", "activity", "accounts_filed_event", value=str(value),
+                                  qualifier=str(value), effective_at=day,
+                                  display=f"Annual accounts for {value} registered as filed on {day}",
+                                  extra={"event_date": day, "year": str(value)})
+        claim = ledger.json_claim(doc, base, "activity", "registry_update", value=day, qualifier=f"{day}:{item.get('oppdateringsid')}",
+                                  effective_at=day, display=f"{day}: the register updated the {_join_labels(labels)}",
+                                  span_keys=("dato", "oppdateringsid", "endringstype", "endringer"),
+                                  extra={"event_date": day, "changed_fields": fields, "changed_labels": labels,
+                                         "update_id": item.get("oppdateringsid")})
+        if claim:
+            events.append(claim)
+        if len(events) >= limit:
+            break
+    return ("available" if events else "not_available"), events
+
+
+def _join_labels(labels: list[str]) -> str:
+    return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " and " + labels[-1]
+
+
+# -- English industry labels (Statistics Norway classification API, one request per run) ------------------------------
+class IndustryLabels:
+    """Official English names for the SN/NACE codes the register uses, so a reader knows what the company does."""
+
+    def __init__(self, fetcher: Fetcher, today: str) -> None:
+        self.fetcher = fetcher
+        self.today = today
+        self._lock = threading.Lock()
+        self._docs: list[tuple[Document, dict[str, int], str]] | None = None
+        self.error: str | None = None
+
+    def _load(self) -> list[tuple[Document, dict[str, int], str]]:
+        with self._lock:
+            if self._docs is not None:
+                return self._docs
+            docs = []
+            for url, version in ((KLASS_NACE.format(day=self.today), "SN2025"), (KLASS_NACE_2007, "SN2007")):
+                result = self.fetcher.get(url, accept="application/json", retries=2, max_bytes=8_000_000)
+                if not result.ok:
+                    self.error = result.error or f"HTTP {result.status}"
+                    continue
+                try:
+                    doc = _document(result, "official_classification")
+                except ValueError as exc:
+                    self.error = f"invalid JSON: {exc}"
+                    continue
+                codes = (doc.data or {}).get("codes") or []
+                docs.append((doc, {str(c.get("code")): n for n, c in enumerate(codes) if c.get("name")}, version))
+            self._docs = docs
+            return docs
+
+    def claim(self, ledger: Ledger, code: str | None, field_name: str = "industry_en") -> dict[str, Any] | None:
+        if not code or code.startswith("00."):
+            return None
+        for doc, index, version in self._load():
+            n = index.get(code)
+            if n is None:
+                continue
+            name = doc.data["codes"][n]["name"]
+            return ledger.json_claim(doc, f"/codes/{n}", "identity", field_name, value=name, qualifier=code,
+                                     display=f"{name} (NACE {code}, English label from Statistics Norway)",
+                                     span_keys=("code", "name", "level", "validFrom", "validTo"),
+                                     extra={"code": code, "classification": version})
+        return None

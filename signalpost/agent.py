@@ -18,8 +18,9 @@ from .ledger import Ledger
 from .nav import NavJobs
 from .net import Fetcher, resolve, utc_now
 from .refresh import diff
-from .registry import (account_claims, entity_claims, fetch_accounts, fetch_entity, fetch_group, fetch_roles, fetch_subunits,
-                       group_claims, role_claims, subunit_claims)
+from .registry import (IndustryLabels, account_claims, account_copy_claims, entity_claims, fetch_account_copies, fetch_accounts,
+                       fetch_entity, fetch_group, fetch_roles, fetch_subunits, fetch_updates, group_claims, role_claims, subunit_claims,
+                       update_claims)
 from .search import SearchProvider
 from .synth import build_summary
 from .web import (FREEMAIL, Candidate, Company, SiteResearcher, candidate_slugs, extract_site, feed_posts, handle_matches, host_of,
@@ -68,6 +69,7 @@ class Agent:
         self.log = log
         self.started_at = utc_now()
         self.today = datetime.now(timezone.utc).date().isoformat()
+        self.industry_labels = IndustryLabels(self.fetcher, self.today)
         self._errors: dict[str, list[dict[str, Any]]] = {}
         self._elapsed: dict[str, float] = {}
         self._errors_lock = threading.Lock()
@@ -95,6 +97,9 @@ class Agent:
         name = entity.get("navn") or (bulk_row or {}).get("name") or (bulk_row or {}).get("navn") or ""
         if result.status == 410 or entity.get("slettedato"):
             work.notes["identity"] = "entity deleted from the register"
+        for key, field_name in (("naeringskode1", "industry_en"), ("naeringskode2", "secondary_industry_en"),
+                                ("naeringskode3", "secondary_industry_en")):
+            self.industry_labels.claim(ledger, (entity.get(key) or {}).get("kode"), field_name)
         acc = fetch_accounts(self.fetcher, org)
         work.states["accounts"], work.accounts = account_claims(ledger, acc)
         if work.states["accounts"] != "available" and acc.status not in (404, 410):
@@ -110,6 +115,11 @@ class Agent:
         if entity.get("erIKonsern"):
             group = fetch_group(self.fetcher, org)
             group_claims(ledger, group, org)
+        if state == "available":
+            updates = fetch_updates(self.fetcher, org, self.today)
+            updates_state, _ = update_claims(ledger, updates, self.today)
+            if updates_state == "failed":
+                work.errors.append({"section": "activity", "source": updates.url, "error": updates.error or f"HTTP {updates.status}"})
         phones = {p for p in (phone_digits(entity.get("telefon")), phone_digits(entity.get("mobil"))) if p}
         for unit in work.subunits:
             phones |= {p for p in (phone_digits(x) for x in unit.get("phones", [])) if p}
@@ -202,6 +212,12 @@ class Agent:
         company = work.company
         assert company is not None
         ledger = work.ledger
+        if self.remaining() > 40 and work.states.get("accounts") == "available":
+            copies = fetch_account_copies(self.fetcher, work.org)
+            copies_state, _ = account_copy_claims(ledger, copies, work.org)
+            if copies_state in ("failed", "blocked"):
+                work.errors.append({"section": "accounts", "source": copies.url,
+                                    "error": f"annual-account copies list: {copies.error or 'HTTP ' + str(copies.status)}"})
         verified = None
         extra_sites: list[Any] = []
         related = None
@@ -409,7 +425,7 @@ class Agent:
         if work.states.get("accounts") != "available":
             missing.append("accounts")
         summary = build_summary(ledger, {"accounts": work.accounts, "changes": changes, "previous_run_id": (previous or {}).get("run", {}).get("run_id"),
-                                         "missing": missing})
+                                         "missing": missing, "today": self.today, "states": dict(work.states), "notes": dict(work.notes)})
         sections = {}
         for section in SECTIONS:
             claim_ids = [c["id"] for c in ledger.claims if c["section"] == section]
