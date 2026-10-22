@@ -1,2 +1,2 @@
 """Signalpost: evidence-first company research for Norwegian organisation numbers."""
-__version__ = "1.1.0"
+__version__ = "1.2.0"

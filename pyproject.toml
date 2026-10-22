@@ -1,6 +1,6 @@
 [project]
 name = "signalpost-agent"
-version = "1.1.0"
+version = "1.2.0"
 description = "Evidence-first company research agent for Norwegian organisation numbers (Builderr Signalpost challenge)"
 requires-python = ">=3.11"
 dependencies = []  # standard library only: nothing to resolve, nothing to drift

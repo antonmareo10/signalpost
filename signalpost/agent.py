@@ -24,10 +24,11 @@ from .registry import (IndustryLabels, account_claims, account_copy_claims, enti
                        update_claims)
 from .search import SearchProvider
 from .synth import build_summary
-from .web import (FREEMAIL, Candidate, Company, SiteResearcher, candidate_slugs, extract_site, feed_posts, handle_matches, host_of,
-                  jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits, registrable)
+from .web import (FREEMAIL, LOW_ACTIVITY, Candidate, Company, SiteResearcher, candidate_slugs, extract_site, feed_posts, handle_matches,
+                  host_of, jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits, registrable)
 
 SECTIONS = ("identity", "accounts", "people", "website", "hiring", "activity")
+SMALL_ACTIVE_REVENUE = 100_000  # NOK: below this a company with no employees is treated as dormant (no domain guessing)
 STATES = {"available", "not_available", "blocked", "not_applicable", "ambiguous", "failed"}
 
 
@@ -179,7 +180,11 @@ class Agent:
             add(unit.get("website"), "registry_subunit_website", "strong")
         for unit in work.subunits:
             add(email_domain(unit.get("email")), "registry_subunit_email_domain", "medium", unit.get("email") or "")
-        if self.guess_domains and self._operating(company):
+        tier = self._activity_tier(company)
+        if self.guess_domains and tier:
+            # Small but active companies (often owner-run, with no registered employees) get guesses too, but their sites
+            # need stronger proof: see LOW_ACTIVITY in web.SiteResearcher._decide.
+            note = "" if tier == "operating" else LOW_ACTIVITY
             slugs = candidate_slugs(company)
             for brand in company.brands[:2]:
                 slugs += candidate_slugs(Company(org=company.org, name=brand))[:1]
@@ -188,8 +193,10 @@ class Agent:
                     host = slug + tld
                     if registrable(host) in seen:
                         continue
-                    if resolve(host) or resolve("www." + host):
-                        add("https://" + host, "domain_guess_from_legal_name", "weak")
+                    if resolve(host):
+                        add("https://" + host, "domain_guess_from_legal_name", "weak", note)
+                    elif resolve("www." + host):  # only the www name exists in DNS: start there
+                        add("https://www." + host, "domain_guess_from_legal_name", "weak", note)
         return out
 
     @staticmethod
@@ -208,12 +215,21 @@ class Agent:
         return out[:5]
 
     def _operating(self, company: Company) -> bool:
+        return self._activity_tier(company) == "operating"
+
+    @staticmethod
+    def _activity_tier(company: Company) -> str | None:
+        """'operating' (employees or NOK 1M+ revenue), 'small' (NOK 100k+ revenue) or None (holding/property/dormant)."""
         name = company.name.lower()
         if re.search(r"\b(holding|invest|investering|eiendom|eiendommer|property|kapital|capital)\b", name):
-            return False
+            return None
         if company.industry.startswith(("64.2", "64.3", "68.2", "70.1")):
-            return False
-        return bool((company.employees or 0) >= 1 or (company.revenue or 0) >= 1_000_000)
+            return None
+        if (company.employees or 0) >= 1 or (company.revenue or 0) >= 1_000_000:
+            return "operating"
+        if (company.revenue or 0) >= SMALL_ACTIVE_REVENUE:
+            return "small"
+        return None
 
     def footprint(self, work: Work) -> None:
         company = work.company

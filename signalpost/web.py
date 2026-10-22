@@ -65,6 +65,12 @@ CAREER_TEXT = re.compile(r"^(karriere|ledige stillinger|stillinger|jobb hos oss|
                          r"vi ansetter|ledig stilling|jobbmuligheter|work with us|jobbe i [\w ]+)$", re.I)
 
 
+# Candidate note for guessed domains of small companies (no employees, NOK 100k–1M revenue): fewer of them have a site at
+# all, so a matching domain is likelier to be someone else's. Their sites need the organisation number, the exact legal
+# name, or the legal name plus a registered contact detail; "the name is unique in the register" is not enough.
+LOW_ACTIVITY = "low_activity_company"
+
+
 def career_path(path: str) -> bool:
     segments = [s for s in urllib.parse.unquote(path).lower().split("/") if s]
     if not segments or re.search(r"/20\d\d/", path) or any(s in {"product", "produkt", "produkter", "shop", "nettbutikk"} for s in segments):
@@ -120,6 +126,33 @@ def normalize_site_url(value: str | None) -> str | None:
     if not host or "." not in host or host.endswith(tuple(SHARED_HOSTS)) or host in SHARED_HOSTS:
         return None
     return value
+
+
+def recoverable_failure(result: FetchResult) -> bool:
+    """A failure that says nothing about the site itself: the host name did not resolve, the connection or TLS
+    handshake failed or timed out, or a deep link is dead. Refusals (robots.txt, 401/403/429) are not recoverable."""
+    error = result.error or ""
+    if result.blocked:
+        return error.startswith("unsafe_url: hostname did not resolve")
+    if result.status is None:
+        return bool(error) and not error.startswith("unsafe")
+    return result.status in (404, 409, 410, 500, 502, 503, 521, 522, 523, 525, 526)
+
+
+def alternate_urls(url: str) -> list[str]:
+    """Other spellings of the same site on the same registrable domain: the root of a dead deep link, then the host
+    with or without "www." (https first). The domain never changes, so the identity proof is unaffected."""
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").lower().rstrip(".")
+    if not host or "." not in host:
+        return []
+    out: list[str] = []
+    if parts.path not in ("", "/") or parts.query:
+        out.append(f"https://{host}/")
+    other = host[4:] if host.startswith("www.") else "www." + host
+    if registrable(host_of("https://" + other)) == registrable(host_of(url)):
+        out.append(f"https://{other}/")  # _fetch_page falls back to http:// by itself when https cannot connect
+    return [u for u in out if u.rstrip("/") != url.rstrip("/")]
 
 
 def _strip_forms(toks: list[str]) -> list[str]:
@@ -260,6 +293,16 @@ class SiteResearcher:
 
     def research(self, company: Company, candidate: Candidate) -> SiteResult:
         result, home = self._fetch_page(candidate.url, retries=1 if candidate.strength in ("strong", "medium") else 0)
+        if home is None and recoverable_failure(result):
+            # Same registrable domain, other spelling: many small sites only answer on www (or only on the apex), have a
+            # certificate for one of the two, or list a dead deep link in the register. A refusal (robots.txt, 401/403/429)
+            # is never retried under another spelling.
+            for alt_url in alternate_urls(candidate.url):
+                alt_result, alt_home = self._fetch_page(alt_url)
+                if alt_home is not None or alt_result.status in (401, 403, 429) or \
+                        (alt_result.blocked and "robots" in (alt_result.error or "")):
+                    result, home = alt_result, alt_home
+                    break
         if result.blocked:
             return SiteResult(candidate, "blocked", result.error or "blocked")
         if result.status in (401, 403, 429):
@@ -431,7 +474,8 @@ class SiteResearcher:
         foreign = bool(proof["other_orgnrs"]) and not proof["orgnr"]
         if proof["orgnr"]:
             return "verified", 0.99, "organisation number shown on the site"
-        if candidate.strength != "strong" and not contact and not foreign and proof["name_identity"] and domain_name:
+        if candidate.strength != "strong" and not contact and not foreign and proof["name_identity"] and domain_name \
+                and candidate.note != LOW_ACTIVITY:
             proof["name_unique_in_register"] = self._name_unique(company)
 
         if candidate.strength == "strong":
@@ -465,7 +509,8 @@ class SiteResearcher:
             return "verified", 0.95, "legal name and a registered contact detail on a site named after the company"
         if exact_name:
             return "verified", 0.94, "the full registered legal name (unique in Norway) is printed on a site named after the company"
-        if proof["name_identity"] and proof.get("name_unique_in_register") and proof.get("norwegian_context"):
+        if proof["name_identity"] and proof.get("name_unique_in_register") and proof.get("norwegian_context") \
+                and candidate.note != LOW_ACTIVITY:
             return "verified", 0.92, "on-site name and domain match the legal name, and no other registered entity carries that name"
         return "rejected", 0.3, "insufficient exact-entity evidence for a discovered domain"
 
@@ -601,6 +646,11 @@ FOREIGN_FORMS = {"ag", "gmbh", "ab", "oy", "oyj", "aps", "ltd", "limited", "inc"
 GROUP_WORDS = {"group", "gruppen", "konsern", "konsernet", "holding"}
 
 
+def clean_brand(text: str) -> str:
+    """Drop separators left at either end of a title or site name: "Tonemakeriet |" -> "Tonemakeriet"."""
+    return re.sub(r"^[\s|\-–—:·•]+|[\s|\-–—:·•]+$", "", text)
+
+
 def acceptable_brand(brand: str, company: Company, site_host: str) -> bool:
     """A public brand must be short, not the legal name itself, not a domain, not a person registered in a role,
     and must not name a *different* legal entity (e.g. 'Knut Hovet AS' on the site of 'KNUT HOVET INSTALLASJONAR AS')."""
@@ -712,6 +762,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
             if compact and len(compact) >= 3 and (compact in label or label in compact) and len(piece) <= 60:
                 brand, span = piece, f"[title] {home.title}"
                 break
+    brand = clean_brand(brand) if brand else brand
     if brand and span and acceptable_brand(brand, company, site_host):
         claim = ledger.text_claim(home_doc, span, "identity", "public_brand", brand, confidence=0.9, method="site_metadata")
         if claim:
