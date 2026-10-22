@@ -203,7 +203,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     report = build_report(envelopes, agent, args, started, inputs)
     report["previous_envelopes"] = Path(previous_path).name if previous_path else None
     site_dir = Path(args.site) if args.site else out.parent / "site"
-    report["viewer"] = None if args.no_site else str(site_dir / "index.html")
+    report["viewer"] = None if args.no_site else os.path.relpath(site_dir / "index.html", out.parent).replace(os.sep, "/")
     report_path = Path(args.report) if args.report else out.with_name("run-report.json")
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if not args.no_site:

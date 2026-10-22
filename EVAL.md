@@ -26,6 +26,20 @@ Evidence audit (`eval/audit_evidence.py`) on the v1.1.0 smoke run: 9,344 / 9,344
 snapshots. A second run on the same day: 0 changes, 0 carried-forward claims (idempotent refresh holds for the new
 families too). Unit tests: 35 offline tests.
 
+Scale, same 1,000 random companies as below (seed 1000), 22 Oct, keyless, 24 workers:
+
+| Run | Wall clock | Validation | Copies lists | p50 / p95 per company | Notes |
+|---|---|---|---|---|---|
+| v1.1.0 draft, copies called at ≈4/s inside the website phase | 802 s | passed | 900 / 1,000 | 11.2 s / 36.8 s | 98 refusals (HTTP 429), reported as `blocked` |
+| v1.1.0, one paced copies thread, waiting for every list | 1,012 s | passed | 1,000 / 1,000 | 5.7 s / 15.0 s | 0 refusals left; 1 Regnskapsregisteret HTTP 500 (accounts) |
+
+The copies endpoint sustains less than one request per second (260 calls alone at 2/s still drew 10 refusals), so
+the released default waits at most 300 s for it after the other phases (`SIGNALPOST_COPIES_WAIT_SECONDS`); a company not
+reached in time carries an explicit error and no "no documents" claim. Expected wall clock for 1,000 companies: about
+16 minutes, inside the 55-minute default budget. Other families on that batch: register history 997, English industry
+label 888 (the rest are registered as "00.000 unspecified"), employee-count history 142, verified websites 102–104
+(the same-day difference is a closed connection and a robots.txt refusal, both reported, not guessed).
+
 Website discovery: "A/S" and "A.S.A." are now stripped as legal forms, and names with a connector word are also tried
 with it ("Nesset og Eidem" → nessetogeidem.no). On the 27 such companies of the 1,000-company batch this found one more
 verified website (organisation number printed on the site) and changed no rejection. A Wikidata lookup by
@@ -41,7 +55,7 @@ agent already finds 5 of the 7 websites listed there; the other two are a group 
 | Independent evidence audit (`eval/audit_evidence.py`) | smoke-100: 8,018 / 8,018 excerpts re-found in their stored snapshots; Builderr sample: 10,509 / 10,509; NAV ads are verified against a stored projection (raw ads with contact persons are deliberately not kept) |
 | Synthesis gate | sentences whose numbers are not cited values or declared computations are dropped (0 dropped in the smoke run) |
 | Unit tests | 24 offline tests: `python -m unittest discover -s tests` (Python 3.11 and 3.14) |
-| Runtime (24 workers) | 100 companies ≈ 75 s; 300 ≈ 3.6 min; **1,000 ≈ 9.6 min** (5,859 requests, p95 per company 16 s, US$0) |
+| Runtime (24 workers) | v1.0.0: 100 companies ≈ 75 s; 300 ≈ 3.6 min; 1,000 ≈ 9.6 min (5,859 requests, p95 per company 16 s, US$0). v1.1.0: 100 ≈ 76–112 s; 1,000 ≈ 13–17 min (paced annual-account copies, see the top of this file) |
 | Scale test, 1,000 random companies (seed 1000, fresh cache) | 1,000/1,000 envelopes, validation passed, 1 company with a source error (Regnskapsregisteret HTTP 500, reported as `failed` for that section); evidence audit 81,782 / 81,782 excerpts re-found (100%) |
 
 ## Coverage on random companies (keyless)
