@@ -3,6 +3,46 @@
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
 
+## Version 1.2.0 (22 Oct): more websites, and three wrong-site cases closed
+
+Same 1,000 random companies as the scale test below (seed 1000), 1.1.0 and 1.2.0 run back to back on 22 Oct, keyless,
+24 workers:
+
+| Family | 1.1.0: companies / facts | 1.2.0: companies / facts |
+|---|---|---|
+| Verified website | 104 / 106 | **117 / 119** |
+| Company-owned social profiles | 69 / 139 | **77 / 153** |
+| Careers page or job ads | 21 / 23 | **23 / 25** |
+| Dated own-channel posts | 7 / 32 | 7 / 32 |
+| Wall clock | 1,940 s (this run; 775 s an hour earlier) | 964 s (877 s an hour earlier) |
+
+Validation passed on both. 15 websites gained and 2 removed, all reviewed by hand:
+- **Gained (15):** 14 small active companies that were never guessed before (no registered employees, NOK 100k–1M
+  revenue), and one site that only answers on `www`. Proof on the site: the organisation number for 11, the legal
+  name with the registered address or phone for 3, the exact legal name for 1 (Spellplassen AS, whose site prints its
+  organisation number with two digits swapped).
+- **Removed (2), now `not_available`:** legentic.com for LEGENTIC SERVICES AS (the domain only matches "Legentic", which
+  five other registered companies share: a group site) and lekeplassmontorene.no (the web host's default page, "This
+  domain is hosted by NordkappNett AS").
+- **Never published:** kriss-consulting.com for KRISS CONSULTING AS. 1.1.0 could not reach it; reaching it via `www`
+  showed "Kriss Consulting Inc", an IT company, while the Norwegian company is a carpentry consultancy in Kristiansand.
+  Its page carried `lang="no"` only because Google Sites follows the visitor's Accept-Language. 1.2.0 rejects a site
+  that names the company with a foreign legal form its own name lacks, and counts `lang="no"` as Norwegian context only
+  when the visible text is Norwegian.
+
+The other five websites verified by the name-search route in this batch (kokooo.no, rigelmap.no, tjuvgods.no,
+bjornsen-advokatfirma.no, supermercado.no in smoke-100) were re-checked by hand under the new rules and stay verified.
+
+Smoke test (`samples/smoke-100.jsonl`, three passes, 22 Oct): 100/100 envelopes, validation passed on every pass,
+verified websites 8 → 10 (brandmaker.no prints the registered Bergen address and phone; novooi.com prints the
+organisation number), third pass 0 changes and 0 carried-forward claims, evidence audit 9,353 / 9,353 excerpts
+re-found. 53 offline unit tests.
+
+Measured and **not** added (details in the submission notes): Wikidata (no new own websites in 500 companies); Norid
+whois/RDAP (whois gives no holder and restricts use; anonymous RDAP gives no holder and allows 300 lookups a day);
+a registered officer's name on a name-matching site as proof (1 extra website in 1,000, and 2 of 3 matches were the
+officer's other company).
+
 ## Version 1.1.0 (22 Oct): what changed, measured on the same 100 companies the same day
 
 Both versions were run on `samples/smoke-100.jsonl` on 22 Oct 2026, keyless.
