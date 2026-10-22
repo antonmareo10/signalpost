@@ -22,7 +22,7 @@ That one command writes:
 |---|---|
 | `out/envelopes.jsonl` | one envelope per input organisation number, same order as the input |
 | `out/run-report.json` | counts, section states, coverage per field family, requests, p50/p95, cost, contract validation |
-| `out/site/index.html` | self-contained viewer: search, filters, side-by-side compare, click-through evidence (desktop + mobile) |
+| `out/site/index.html` | self-contained viewer (no server, no external requests): find, compare and verify on desktop and mobile — see below |
 | `out/snapshots/` | immutable gzip snapshots of every fetched source, named by SHA-256 |
 | `out/history/<run_id>.jsonl` | every run is kept; the next run diffs against the latest one |
 
@@ -33,6 +33,21 @@ Useful options: `--bulk <brreg snapshot .csv|.jsonl[.gz]>` (identity fallback + 
 Rebuild the viewer from any envelopes file: `python -m signalpost site --envelopes out/envelopes.jsonl --site out/site`.
 
 Tests (offline): `python -m unittest discover -s tests`.
+
+### The viewer (find, compare, verify)
+- **Find**: one search box over name, organisation number (with or without spaces), brand, place, person, industry and
+  former names, folded for æ/ø/å; Enter on an exact organisation number opens that profile; `/` focuses the search;
+  filters for verified website, hiring, social profiles, filed accounts, signals and changes; sort by evidence, name,
+  revenue or employees.
+- **Compare**: tick up to four companies (or add one by name/number inside the compare view); the table keeps the
+  first column fixed on phones and shades the rows where the companies differ.
+- **Verify**: every statement carries numbered buttons that open the exact excerpt, the source (named in plain
+  English), the URL, the retrieval time, the SHA-256 of the stored copy and the JSON pointer or locator, with
+  "Open source" and "Copy citation"; each profile can be downloaded as JSON. Missing values read "not found", never zero.
+- Each profile opens with the summary in five labelled parts (what it does, money, people and presence, what changed,
+  not found) and cited signals, then the accounts table with links to the official PDF of every filed year, identity,
+  leadership, website and profiles, hiring, a dated timeline of register events and own-channel posts, changes since
+  the previous run and what could not be found, with the reason.
 
 ### Optional search provider
 Website discovery works without any key (registry website, registry e-mail domain, NAV employer homepage, workplace
@@ -54,7 +69,10 @@ per query; capped by `--max-search` (default 400 per run).
     "identity": {"state": "available", "claims": 31, "note": null},
     "accounts": {…}, "people": {…}, "website": {…}, "hiring": {…}, "activity": {…}
   },
-  "summary": {"text": "…", "sentences": [{"text": "…", "claim_ids": ["c-…"]}], "unknowns": ["active job ads", …]},
+  "summary": {"text": "…", "sentences": [{"text": "…", "claim_ids": ["c-…"], "part": "what_changed"}],
+              "parts": {"what_it_does": […], "money": […], "people_and_presence": […], "what_changed": […], "unknown": […]},
+              "signals": [{"text": "Revenue grew 107.4% in 2025.", "claim_ids": […], "tone": "up"}],
+              "unknowns": ["active job ads", …], "unknown_detail": [{"item": "…", "state": "not_available", "reason": "…"}]},
   "claims": [{"id": "c-…", "section": "accounts", "field": "revenue", "key": "revenue|2025:SELSKAP", "value": 10021242.0,
               "display": "Revenue 2025: NOK 10,021,242", "reporting_period": "2025-01-01..2025-12-31",
               "evidence_ids": ["ev-…"], "availability": "available", "confidence": 1.0}],
@@ -72,10 +90,12 @@ per query; capped by `--max-search` (default 400 per run).
 
 Field families published: legal identity (name, form, addresses, industry codes, founding/registration dates, registered
 employees, share capital, statutory purpose, VAT/business-register status, former names, group parent/subsidiaries,
-registered contact details), annual accounts for every year the register returns (company and group accounts, 20 line
-items), roles (CEO, chair, board, deputies, auditor, accountant), registered workplaces, verified official website and
-identity proof, public brand, site description, company-owned social profiles, careers pages, active NAV job ads, dated
-posts/news from the company's own site and dated register events.
+registered contact details, official English industry label), annual accounts for every year the register returns
+(company and group accounts, 20 line items) plus the official PDF copy of every filed year, roles (CEO, chair, board,
+deputies, auditor, accountant), registered workplaces, verified official website and identity proof, public brand, site
+description, company-owned social profiles, careers pages, active NAV job ads, dated posts/news from the company's own
+site, and the dated register history (what the register changed and when: employee count, filed accounts, addresses,
+industry code, contact details, roles).
 
 ## How it decides what belongs to the company
 
@@ -97,15 +117,32 @@ posts/news from the company's own site and dated register events.
 5. **Jobs** – NAV's public job-vacancy feed (public token, republishing permitted by NAV's API terms). An ad is attributed
    only when `employer.orgnr` is the company or one of its registered workplaces. Contact persons are never stored.
 6. **Dated activity** – RSS/Atom feeds and dated news teasers on the verified site (the date must be in the teaser or the
-   only date on the adjacent line), plus dated register events (role changes).
+   only date on the adjacent line), plus dated register events: role changes, and Enhetsregisteret's update log filtered
+   to this organisation number (only entries that state which fields changed; the last 24 months).
+7. **Filed-accounts documents** – Regnskapsregisteret's list of annual-account copies for this organisation number; each
+   year becomes a claim with the official PDF URL. The endpoint publishes a small request budget, so calls are paced
+   (≈4/s) and a refusal is reported as `blocked`, never as "no documents".
+8. **English industry label** – Statistics Norway's classification API (KLASS), fetched once per run, gives the official
+   English name of each SN/NACE code the register uses, so the profile says what the company does in plain English.
 
 ## Synthesis and refresh
 
 The summary is generated from verified claims only (no language model). Each sentence lists the claim ids it rests on,
 and `check_sentence` rejects any sentence containing a number that is not a cited value or a declared computation
-(revenue change, operating margin, equity ratio). It covers what the company does, size and latest filed figures,
-leadership, footprint, website and profiles, hiring, latest dated activity, changes since the previous run and what could
-not be found.
+(revenue change, operating margin, equity ratio, counts). It is organised in five parts that answer the brief directly:
+
+- **What it does** – legal form, place, founding year, the official English industry label next to the Norwegian one,
+  the company's own description (or statutory purpose), registered employees and group parent.
+- **Money** – latest filed figures with the year-on-year change, margin and equity ratio, revenue by filed year,
+  negative equity and unaudited accounts, and how many official PDF copies exist.
+- **People and presence** – leadership, workplaces, verified website and profiles, hiring, latest own-channel post.
+- **What changed** – the register's employee-count history, when the latest accounts were filed, other register changes
+  in the last 12 months (addresses, industry code, contact details…), the last role change, former names, and the diff
+  against our previous run (or a plain statement that this is the first run).
+- **Not found** – each missing family with its state and the reason (`unknown_detail`).
+
+`signals` lists up to six short, cited flags a reader acts on (revenue up/down ≥25 %, employee count change, negative
+equity, register flags, recent address/name/industry change, recent leadership change, young company, hiring now).
 
 Refresh is a diff on stable claim keys (`field|qualifier`), so re-running the same snapshot yields no changes. Sections
 that fail or are blocked keep the previous supported value (`carried_forward_from`) instead of producing false
@@ -116,6 +153,9 @@ removals. Every run's envelopes are preserved in `history/`.
 | Source | Use | Terms |
 |---|---|---|
 | data.brreg.no Enhetsregisteret + Regnskapsregisteret | identity, roles, workplaces, group, accounts, name-uniqueness check | NLOD 2.0 open data |
+| data.brreg.no Enhetsregisteret update log (`oppdateringer/enheter?organisasjonsnummer=…`) | dated register history | NLOD 2.0 open data |
+| data.brreg.no Regnskapsregisteret annual-account copies (`aarsregnskap/kopi/{org}/aar`) | list of filed years with the official PDF URL | NLOD 2.0 open data; paced to the published request budget |
+| data.ssb.no KLASS (classification 6, SN2025 with SN2007 fallback) | official English industry labels | Statistics Norway open data (attribution: Statistics Norway) |
 | pam-stilling-feed.nav.no (public token) | active job ads by employer organisation number | NAV API terms: anyone may use and republish ads |
 | The company's own website (only after the identity gate) | website, description, brand, social links, careers page, posts | robots.txt honoured; honest User-Agent; ≤2 concurrent requests per host |
 | Brave / Tavily (only if a key is supplied) | website candidates only, never evidence | provider terms; results kept in memory/cache only |

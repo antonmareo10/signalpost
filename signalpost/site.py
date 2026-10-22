@@ -205,6 +205,7 @@ footer.foot{color:var(--muted);font-size:12.5px;padding:24px 0}
 #view:focus{outline:none}
 @media (max-width:640px){header.top{position:static}.bar .meta{display:none}.search kbd{display:none}.filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}.filters>*{flex:0 0 auto}.hero{padding:14px}.part p{font-size:15px}.cmpt th,.cmpt td{min-width:132px}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+a.sr:focus{position:fixed;left:12px;top:12px;width:auto;height:auto;clip:auto;z-index:20;background:var(--panel);color:var(--accent);padding:8px 12px;border-radius:8px;border:2px solid var(--accent)}
 @media print{header.top,.tray,.drawer,.scrim,label.cmp,.btn,.cardfoot{display:none!important}body{background:#fff}}
 </style>
 </head>
@@ -319,7 +320,7 @@ function profile(o){const c=byOrg[o];citeIndex={};if(!c){$("#view").innerHTML=`<
   const jobs=claims(c,"job_posting").sort((a,b)=>String(b.t||"").localeCompare(String(a.t||""))).map(x=>`<li>${link(x.url,x.d)}${cite(c,[x.i])}<div class="src">published ${esc(x.t||"?")}${x.expires?` · apply by ${esc(x.expires)}`:""}</div></li>`).join("");
   const careers=li(claims(c,"careers_page"),x=>link(x.v));
   const TL={website_post:"Own channels",registry_role_change:"Roles register",job_posting:"Job ad",registry_update:"Register",accounts_filed_event:"Accounts filed",employees_history:"Employees"};
-  const tlItems=[...claims(c,"website_post"),...claims(c,"registry_role_change"),...claims(c,"job_posting"),...claims(c,"registry_update"),...claims(c,"employees_history")].filter(x=>x.t).sort((a,b)=>String(b.t).localeCompare(String(a.t))).slice(0,14);
+  const tlItems=[...claims(c,"website_post"),...claims(c,"registry_role_change"),...claims(c,"job_posting"),...claims(c,"registry_update").filter(x=>!((x.changed_labels||[]).length===1&&x.changed_labels[0]==="employee count")),...claims(c,"employees_history")].filter(x=>x.t).sort((a,b)=>String(b.t).localeCompare(String(a.t))).slice(0,14);
   const acts=tlItems.map(x=>`<li><time datetime="${esc(String(x.t).slice(0,10))}">${esc(String(x.t).slice(0,10))} · ${esc(TL[x.f]||x.f)}</time>${esc(x.f==="job_posting"?x.d:x.f==="registry_update"?"Updated: "+((x.changed_labels||[]).join(", ")||x.d):x.d.replace(/^\d{4}-\d\d-\d\d (—|-) /,""))}${cite(c,[x.i])}</li>`).join("");
   const changes=c.ch.map(x=>`<li class="change ${esc(x.m)}">${esc(x.d)} <span class="pill">${esc(x.m)}</span>${cite(c,x.c.filter(id=>c.cl.some(z=>z.i===id)))}</li>`).join("");
   const unkRows=(c.unkd&&c.unkd.length?c.unkd.map(u=>`<li><strong>${esc(u.item)}</strong>: ${esc(STATE_LABEL[u.state]||u.state)}${u.reason?` (${esc(u.reason)})`:""}</li>`):SECTIONS.filter(([k])=>(c.sec[k]||{}).s!=="available").map(([k,l])=>`<li><strong>${esc(l)}</strong>: ${esc(STATE_LABEL[(c.sec[k]||{}).s]||"not found")}${(c.sec[k]||{}).n?` (${esc(c.sec[k].n)})`:""}</li>`)).join("");
