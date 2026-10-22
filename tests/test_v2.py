@@ -190,7 +190,7 @@ class NameVariantTests(unittest.TestCase):
         proof = {"orgnr": None, "other_orgnrs": [], "phone": {"url": "u"}, "email": None, "address": None, "name_identity": {"url": "u"},
                  "name_anywhere": None, "domain_name": None, "legal_name_exact": None, "norwegian_context": True}
         researcher = SiteResearcher(fetcher=None)  # type: ignore[arg-type]
-        researcher._name_unique = lambda c: False  # type: ignore[assignment]
+        researcher._name_unique = lambda c, words=None: False  # type: ignore[assignment]
         state, _, _ = researcher._decide(company, Candidate("https://x", "domain_guess_from_legal_name", "weak"), dict(proof), "nessetogeidem.no")
         self.assertEqual(state, "verified")
         state, _, _ = researcher._decide(company, Candidate("https://x", "domain_guess_from_legal_name", "weak"), dict(proof), "eidem.no")

@@ -104,13 +104,20 @@ industry code, contact details, roles).
 2. **Website candidates**, strongest first: website registered in Brreg (entity or workplace, or in the supplied
    snapshot) → domain of the e-mail address registered in Brreg (free-mail excluded) → employer homepage in a NAV ad that
    carries this organisation number → domains derived from the legal name or a workplace brand → optional search.
+   Name-derived domains are tried for operating companies (registered employees or NOK 1M+ revenue) and, since 1.2.0,
+   for small active ones (no employees, NOK 100k–1M revenue; holding, property and investment companies excluded). If a
+   candidate fails for a reason that says nothing about the site (DNS, connection, TLS, timeout, a dead deep link), the
+   same registrable domain is tried once more with or without `www` and at its root; a refusal (robots.txt, HTTP
+   401/403/429) is never retried under another spelling.
 3. **Identity gate** on the fetched site (home page plus contact/about/terms pages, robots.txt respected):
    organisation number printed on the site; or the legal name in the site's identity text together with a registered
    phone/e-mail/street address; or the full legal name *with its legal suffix* (unique in the Register of Business
    Enterprises) on a domain named after the company; or name + domain + Brreg name search proving no other registered
    entity carries that name. Discovered domains must be named after the company (directories print names and phone
    numbers too); a site printing another organisation number is rejected; a registered website that only shares
-   contact details is marked `related` (group/manager site), not published.
+   contact details is marked `related` (group/manager site), not published. For small active companies the name-search
+   route is not enough: fewer of them have a site at all, so their sites need the organisation number, the exact legal
+   name or the legal name plus a registered contact detail.
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
    when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded, and a profile linked
    from several companies' sites in one batch (web-agency footers) is dropped.

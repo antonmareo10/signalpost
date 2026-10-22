@@ -47,6 +47,10 @@ SHARED_HOSTS = {"facebook.com", "instagram.com", "linkedin.com", "google.com", "
                 "linktr.ee", "kommune.no", "uniweb.no", "jimdosite.com", "mamutweb.com", "onepage.website"}
 PUBLIC_SUFFIX_2 = {"co.uk", "org.uk", "com.au", "co.nz", "com.br", "priv.no", "kommune.no", "herad.no", "fylkeskommune.no", "museum.no",
                    "vgs.no", "co.za", "com.tr", "com.cn"}
+# A web host's default page for a domain with no site of its own ("lekeplassmontorene.no -- This domain is hosted by
+# NordkappNett AS"): the page is the host's, so it is never the company's website, whatever its length.
+HOST_PLACEHOLDER = ("this domain is hosted by", "domain is hosted by", "dette domenet er hostet", "dette domenet driftes av",
+                    "domenet er registrert hos", "this domain has been registered", "domain has been registered by")
 PARKED = ("is parked", "has expired", "parkedweb", "does not have an active website", "domain is for sale", "domain for sale", "domenet er til salgs", "this domain may be for sale", "kjøp dette domenet",
           "hugedomains", "parked at", "parkert", "domeneshop.no/park", "her flytter snart en ny gjest", "is parked free",
           "buy this domain", "denne domenen er parkert", "domain parking", "sedo.com", "dan.com", "afternic",
@@ -314,6 +318,9 @@ class SiteResearcher:
             return SiteResult(candidate, "rejected", f"redirects to shared platform {final_host}")
         pages = [(result, home)]
         lowered = fold(home.title + " " + home.text[:4000])
+        if any(fold(marker) in lowered for marker in HOST_PLACEHOLDER):
+            return SiteResult(candidate, "parked", "the web host's default page, not a company site", home_url=result.final_url,
+                              pages=pages)
         if any(marker in lowered for marker in PARKED) or len(home.text) < 40 and not home.jsonld:
             if len(home.text) < 600 or any(marker in lowered for marker in PARKED[:16]):
                 return SiteResult(candidate, "parked", "placeholder, parked or empty page", home_url=result.final_url, pages=pages)
@@ -417,28 +424,38 @@ class SiteResearcher:
                         excerpt = line[:300]
                         break
                 proof["name_anywhere"] = {"url": result.url, "excerpt": excerpt}
+            if not proof.get("foreign_form"):
+                foreign = foreign_form_hit(company.name, identity_text)
+                if foreign:
+                    proof["foreign_form"] = {"url": result.url, "value": foreign}
         proof["other_orgnrs"] = sorted(others)
         home = pages[0][1]
         lang = (home.lang or "").lower()[:2]
         all_text = " ".join(p.text for _, p in pages)
-        proof["norwegian_context"] = bool(host_of(pages[0][0].final_url or "").endswith(".no") or lang in ("no", "nb", "nn")
+        # A lang="no" attribute alone is not Norwegian context: hosted builders (Google Sites, for one) set it from the
+        # visitor's Accept-Language. It counts only when the visible text is Norwegian too.
+        proof["norwegian_context"] = bool(host_of(pages[0][0].final_url or "").endswith(".no")
+                                          or (lang in ("no", "nb", "nn") and looks_norwegian(all_text))
                                           or (company.postcode and company.postcode in all_text)
                                           or (company.city and company.city.lower() in all_text.lower())
                                           or re.search(r"\b(norge|norway|org\.? ?nr)\b", all_text, re.I))
         return proof
 
-    def _name_unique(self, company: Company) -> bool:
-        """True when no other registered entity or workplace (besides this company's own) carries all legal-name words.
+    def _name_unique(self, company: Company, words: list[str] | None = None) -> bool:
+        """True when no other registered entity or workplace (besides this company's own) carries all of ``words``
+        (default: all legal-name words). When the domain only matched the name's distinctive words ("legentic.com" for
+        LEGENTIC SERVICES AS), those are the words that must be unique: five other Legentic companies share them.
 
         Uses Brønnøysund's name search (relevance-ranked), so a namesake would appear among the first results."""
-        core = set(company.core)
+        ordered = list(words) if words else list(company.core)
+        core = set(ordered)
         if not core or len("".join(core)) < 6:
             return False
         key = " ".join(sorted(core))
         with self._unique_lock:
             if key in self._unique_cache:
                 return self._unique_cache[key]
-        query = urllib.parse.quote(" ".join(company.core))
+        query = urllib.parse.quote(" ".join(ordered))
         unique = True
         for kind, url in (("enheter", f"https://data.brreg.no/enhetsregisteret/api/enheter?navn={query}&size=50"),
                           ("underenheter", f"https://data.brreg.no/enhetsregisteret/api/underenheter?navn={query}&size=50")):
@@ -451,7 +468,7 @@ class SiteResearcher:
                 if owner == company.org or item.get("organisasjonsnummer") == company.org:
                     continue
                 other = name_tokens(item.get("navn") or "")
-                if core <= set(other) or "".join(company.core) in "".join(other):
+                if core <= set(other) or "".join(ordered) in "".join(other):
                     unique = False
                     break
             if not unique:
@@ -466,17 +483,24 @@ class SiteResearcher:
         joined = domain_key("".join(core))
         joined_full = domain_key("".join(name_tokens_with_connectors(company.name)))
         dist = [domain_key(t) for t in distinctive(core)]
-        domain_name = bool(joined and (label == joined or (len(joined) >= 6 and joined in label))) or \
-            bool(joined_full and len(joined_full) >= 6 and label == joined_full) or \
-            bool(dist and all(t in label for t in dist) and sum(len(t) for t in dist) >= 5)
+        full_match = bool(joined and (label == joined or (len(joined) >= 6 and joined in label))) or \
+            bool(joined_full and len(joined_full) >= 6 and label == joined_full)
+        domain_name = full_match or bool(dist and all(t in label for t in dist) and sum(len(t) for t in dist) >= 5)
         proof["domain_name"] = domain_name
         contact = proof["phone"] or proof["email"] or proof["address"]
         foreign = bool(proof["other_orgnrs"]) and not proof["orgnr"]
         if proof["orgnr"]:
             return "verified", 0.99, "organisation number shown on the site"
+        if proof.get("foreign_form") and not contact:
+            # "Kriss Consulting Inc" on kriss-consulting.com is not KRISS CONSULTING AS, however unique the name is in Norway.
+            # (A Norwegian site that writes "Ltd" on an English page still passes with a registered phone, e-mail or address.)
+            named = proof["foreign_form"]["value"]
+            if candidate.strength == "strong":
+                return "related", 0.5, f"registered website names a company with another legal form ({named})"
+            return "rejected", 0.2, f"site names a company with another legal form ({named})"
         if candidate.strength != "strong" and not contact and not foreign and proof["name_identity"] and domain_name \
                 and candidate.note != LOW_ACTIVITY:
-            proof["name_unique_in_register"] = self._name_unique(company)
+            proof["name_unique_in_register"] = self._name_unique(company, None if full_match else distinctive(core))
 
         if candidate.strength == "strong":
             if foreign and not proof["name_identity"]:
@@ -544,6 +568,36 @@ def address_on_page(street: str, postcode: str, text: str) -> str | None:
         if all(any(t.startswith(stem) for t in window_tokens) for stem in stems):
             return window.strip()[-160:] if len(window) > 160 else window.strip()
     return None
+
+
+FOREIGN_FORMS = {"inc", "llc", "ltd", "limited", "gmbh", "corp", "corporation", "pty", "plc", "bv", "sas", "sarl", "srl", "spa",
+                 "kg", "ag", "oy", "oyj", "ab", "aps", "kft", "llp", "pte", "bhd"}
+NORWEGIAN_WORDS = set(tokens("og er på til med som av det den har ikke kan vi oss våre eller fra hos ved deg dere vår være blir "
+                             "også hvordan hva kontakt oss"))
+
+
+def foreign_form_hit(legal_name: str, text: str) -> str | None:
+    """The company's name followed by a foreign legal form that its own legal name lacks ("Kriss Consulting Inc" for
+    KRISS CONSULTING AS): the page is about another company of the same name. A NUF keeps its own foreign form."""
+    core = name_tokens(legal_name)
+    if not core:
+        return None
+    own = set(tokens(legal_name))
+    words = tokens(text)
+    size = len(core)
+    for index in range(len(words) - size):
+        if words[index:index + size] == core:
+            following = words[index + size]
+            if following in FOREIGN_FORMS and following not in own:
+                return " ".join(words[index:index + size + 1])
+            if following == "b" and words[index + size + 1:index + size + 2] == ["v"] and "bv" not in own:
+                return " ".join(words[index:index + size]) + " b.v."
+    return None
+
+
+def looks_norwegian(text: str) -> bool:
+    """At least five different Norwegian function words in the visible text."""
+    return len(set(tokens(text[:30000])) & NORWEGIAN_WORDS) >= 5
 
 
 def legal_name_hit(legal_name: str, text: str) -> str | None:

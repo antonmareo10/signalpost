@@ -93,7 +93,7 @@ class IdentityTests(unittest.TestCase):
                 "name_anywhere": None, "domain_name": None, "legal_name_exact": None, "norwegian_context": True}
         base.update(proof)
         researcher = SiteResearcher(fetcher=None)  # type: ignore[arg-type]
-        researcher._name_unique = lambda company: False  # type: ignore[assignment]
+        researcher._name_unique = lambda company, words=None: False  # type: ignore[assignment]
         return researcher._decide(Company(org="923884149", name="STORD REINHALD AS"), Candidate("https://x", "t", strength),
                                   base, "omsorgsguiden.no")
 
