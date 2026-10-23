@@ -124,6 +124,13 @@ class DomainTests(unittest.TestCase):
                                                 Candidate("https://hazl.no", "registry_website", "strong"))
         self.assertEqual(found.state, "gone")
 
+    def test_www_that_exists_but_times_out_is_unreachable_not_gone(self):
+        fetcher = FakeFetcher({"https://hazl.no": lambda u: failed(u, error="unsafe_url: hostname did not resolve", blocked=True),
+                               "https://www.hazl.no/": lambda u: failed(u, error="URLError: timed out")})
+        found = SiteResearcher(fetcher).research(Company(org="934237285", name="HAZL AS"),
+                                                Candidate("https://hazl.no", "registry_website", "strong"))
+        self.assertEqual(found.state, "unreachable")
+
 
 class RegisteredSiteRefusingAccessTests(unittest.TestCase):
     def _work(self, name: str, entity: dict) -> Work:
