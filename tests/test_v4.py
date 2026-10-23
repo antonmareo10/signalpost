@@ -308,3 +308,34 @@ class SharedSiteProfileTests(unittest.TestCase):
 
     def test_nynorsk_eigedom_is_generic(self):
         self.assertTrue(domain_match(Company(org="1", name="TORPOMOEN EIGEDOM AS"), "torpomoen.no")[1])
+
+
+class RefreshRobustnessTests(unittest.TestCase):
+    def test_copies_list_not_read_keeps_the_previous_documents(self):
+        from signalpost.refresh import diff
+        old = {"id": "c-1", "section": "accounts", "field": "annual_accounts_copy", "key": "annual_accounts_copy|2024", "value": "2024",
+               "evidence_ids": ["ev-1"]}
+        previous = {"run": {"run_id": "r1", "completed_at": "2026-10-23T10:00:00Z"}, "claims": [old]}
+        changes, carried = diff({"claims": []}, previous, set(), {"annual_accounts_copy"})
+        self.assertEqual(changes, [])
+        self.assertEqual([c["carried_forward_from"] for c in carried], ["r1"])
+        # and the next run that reads the list again reports no "new" document
+        changes, _ = diff({"claims": [old]}, {"run": {"run_id": "r2"}, "claims": carried}, set())
+        self.assertEqual(changes, [])
+
+    def test_name_search_outage_is_not_a_rejection(self):
+        html = ("<html><head><title>Supermercado</title></head><body><h1>Supermercado</h1><p>Spansk og latinamerikansk mat i Oslo. "
+                "Vi har åpent hver dag og leverer til hele Norge.</p></body></html>")
+        down = lambda u: failed(u, status=503, error="HTTP 503")  # noqa: E731
+        answers = {"https://supermercado.no": lambda u: result(u, html.encode(), "text/html; charset=utf-8")}
+        fetcher = FakeFetcher(answers)
+        fetcher.get_original = fetcher.get
+
+        def get(url, **kwargs):
+            if "data.brreg.no" in url:
+                return down(url)
+            return fetcher.get_original(url, **kwargs)
+        fetcher.get = get
+        found = SiteResearcher(fetcher).research(Company(org="916361750", name="SUPERMERCADO AS", employees=3),
+                                                 Candidate("https://supermercado.no", "domain_guess_from_legal_name", "weak"))
+        self.assertEqual(found.state, "unreachable")

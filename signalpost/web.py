@@ -471,12 +471,13 @@ class SiteResearcher:
                                           or re.search(r"\b(norge|norway|org\.? ?nr)\b", all_text, re.I))
         return proof
 
-    def _name_unique(self, company: Company, words: list[str] | None = None) -> bool:
+    def _name_unique(self, company: Company, words: list[str] | None = None) -> bool | None:
         """True when no other registered entity or workplace (besides this company's own) carries all of ``words``
         (default: all legal-name words). When the domain only matched the name's distinctive words ("legentic.com" for
         LEGENTIC SERVICES AS), those are the words that must be unique: five other Legentic companies share them.
 
-        Uses Brønnøysund's name search (relevance-ranked), so a namesake would appear among the first results."""
+        Uses Brønnøysund's name search (relevance-ranked), so a namesake would appear among the first results.
+        None when the name search did not answer: unknown is not "not unique", and it is not cached."""
         ordered = list(words) if words else list(company.core)
         core = set(ordered)
         if not core or len("".join(core)) < 6:
@@ -489,10 +490,9 @@ class SiteResearcher:
         unique = True
         for kind, url in (("enheter", f"https://data.brreg.no/enhetsregisteret/api/enheter?navn={query}&size=50"),
                           ("underenheter", f"https://data.brreg.no/enhetsregisteret/api/underenheter?navn={query}&size=50")):
-            result = self.fetcher.get(url, accept="application/json", retries=1, snapshot=False)
+            result = self.fetcher.get(url, accept="application/json", retries=2, snapshot=False)
             if not result.ok:
-                unique = False
-                break
+                return None
             for item in ((result.json() or {}).get("_embedded") or {}).get(kind, []):
                 owner = item.get("overordnetEnhet") or item.get("organisasjonsnummer")
                 if owner == company.org or item.get("organisasjonsnummer") == company.org:
@@ -560,6 +560,10 @@ class SiteResearcher:
         if proof["name_identity"] and proof.get("name_unique_in_register") and proof.get("norwegian_context") \
                 and candidate.note != LOW_ACTIVITY:
             return "verified", 0.92, "on-site name and domain match the legal name, and no other registered entity carries that name"
+        if proof["name_identity"] and "name_unique_in_register" in proof and proof["name_unique_in_register"] is None \
+                and proof.get("norwegian_context") and candidate.note != LOW_ACTIVITY:
+            # the decisive check could not run: report it as not checked (the previous run's value is kept), not as rejected
+            return "unreachable", 0.0, "the register's name search did not answer, so the name could not be checked"
         return "rejected", 0.3, "insufficient exact-entity evidence for a discovered domain"
 
 

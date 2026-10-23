@@ -55,7 +55,8 @@ def _display(claim: dict[str, Any]) -> str:
     return str(value if not isinstance(value, dict) else value.get("title") or value.get("name") or value)[:160]
 
 
-def diff(current: dict[str, Any], previous: dict[str, Any] | None, failed_sections: set[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def diff(current: dict[str, Any], previous: dict[str, Any] | None, failed_sections: set[str],
+         failed_fields: set[str] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Returns (changes, carried_forward_claims)."""
     if not previous:
         return [], []
@@ -78,7 +79,7 @@ def diff(current: dict[str, Any], previous: dict[str, Any] | None, failed_sectio
             continue
         news = cur_by_key.get(key)
         if not news:
-            if old["section"] in failed_sections:
+            if old["section"] in failed_sections or field in (failed_fields or set()):
                 keep = dict(old)
                 keep["carried_forward_from"] = run_id
                 keep["last_observed_at"] = old.get("last_observed_at") or observed

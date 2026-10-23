@@ -284,6 +284,8 @@ class Agent:
                 related = result
             if result.state == "unreachable" and candidate.strength in ("strong", "medium") and "HTTP" not in result.reason:
                 unreachable_own = True  # network failure on the company's own registered domain: we could not check
+            if result.state == "unreachable" and "name search did not answer" in result.reason:
+                unreachable_own = True  # the site answered but the register check behind it did not: keep the previous value
             if result.state == "blocked" and candidate.strength in ("strong", "medium"):
                 blocked = True  # a refused *guess* says nothing about the company's own site
                 if candidate.source in ("registry_website", "registry_email_domain"):
@@ -506,18 +508,23 @@ class Agent:
     def envelope(self, work: Work, previous: dict[str, Any] | None, previous_run_id: str | None) -> dict[str, Any]:
         ledger = work.ledger
         copies = self.copies.get(work.org)
+        failed_fields: set[str] = set()
         if copies is not None:
             copies_state, _ = account_copy_claims(ledger, copies, work.org)
             if copies_state in ("failed", "blocked"):
+                failed_fields.add("annual_accounts_copy")
                 work.errors.append({"section": "accounts", "source": copies.url,
                                     "error": f"annual-account copies list: {copies.error or 'HTTP ' + str(copies.status)}"})
         elif work.company is not None:
+            failed_fields.add("annual_accounts_copy")
             work.errors.append({"section": "accounts", "error": "annual-account copies list not reached within the time budget"})
         errors = work.errors + self._errors.get(work.org, [])
         for section in SECTIONS:
             work.states.setdefault(section, "failed" if errors else "not_available")
         failed_sections = {s for s, st in work.states.items() if st in ("failed", "blocked")}
-        changes, carried = diff({"claims": ledger.claims}, previous, failed_sections)
+        # A copies list we could not read this run keeps the previous run's documents instead of dropping them silently
+        # (and announcing them as "new" on the next run).
+        changes, carried = diff({"claims": ledger.claims}, previous, failed_sections, failed_fields)
         if carried:
             prev_evidence = {e["id"]: e for e in (previous or {}).get("evidence", [])}
             for claim in carried:
