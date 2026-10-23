@@ -279,6 +279,9 @@ def build_summary(ledger: Ledger, ctx: dict[str, Any]) -> dict[str, Any]:
     if site and site.get("basis") == "registry_listing":
         people.append(_sentence(f"Its website, as listed in the Brønnøysund register, is {site['value']}; the site refuses automated "
                                 f"access, so its pages were not read.", [site["id"]]))
+    elif site and site.get("site_scope") == "shared_site":
+        people.append(_sentence(f"Its page {site['value']} names the company with a registered contact detail, but the site belongs to a "
+                                f"group, chain or manager, so nothing else is taken from it.", [site["id"]]))
     elif site:
         proof = first("website_identity_proof")
         text = f"Its verified website is {site['value']}"

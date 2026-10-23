@@ -29,7 +29,7 @@ def feed_titles(body: bytes) -> set[str]:
         root = ET.fromstring(body)
     except ET.ParseError:
         try:
-            root = ET.fromstring(_to_text(body, "").lstrip("﻿").encode("utf-8"))
+            root = ET.fromstring(_to_text(body, "").lstrip("\ufeff").encode("utf-8"))
         except ET.ParseError:
             return set()
     titles = set()
@@ -70,7 +70,7 @@ def main() -> None:
             ok = False
             if ev["locator"].startswith("/") or (ev["locator"] == "" and ev["source_class"].startswith("official")):
                 try:
-                    found = resolve_pointer(json.loads(raw.lstrip("﻿")), ev["locator"])
+                    found = resolve_pointer(json.loads(raw.lstrip("\ufeff")), ev["locator"])
                     text = found if isinstance(found, str) else canonical_json(found)
                     ok = squash(span)[:200] in squash(text) or squash(text) in squash(span) or \
                         all(supports(c["value"], text) for c in claims_by_ev.get(ev["id"], []))
@@ -79,7 +79,7 @@ def main() -> None:
             elif ev["locator"] == "final_url":
                 ok = True  # the fetch record itself (URL, time, hash) is the evidence
             else:
-                if raw.lstrip().lstrip("﻿").startswith(("<?xml", "<rss", "<feed", "<rdf")):
+                if raw.lstrip().lstrip("\ufeff").startswith(("<?xml", "<rss", "<feed", "<rdf")):
                     # the cited title must be one of the feed's item titles (entities decoded, spaces collapsed)
                     title = span.replace("[feed item]", "").split("|")[0].strip()
                     ok = title[:60] in raw or title in feed_titles(body)

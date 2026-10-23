@@ -302,10 +302,17 @@ class Agent:
             for extra in extra_sites:
                 extra_info = extract_site(ledger, company, extra, primary=False)
                 work.site.setdefault("additional", []).append({"url": extra_info["url"], "claim_id": extra_info.get("claim_id")})
-            if self.remaining() > 20:
-                work.posts = feed_posts(self.fetcher, ledger, verified) + jsonld_posts(ledger, verified)
+            # Posts dated before the company existed belong to a predecessor or to a theme's demo content.
+            founded = min([d for d in (work.entity.get("stiftelsesdato"), work.entity.get("registreringsdatoEnhetsregisteret")) if d],
+                          default=None)
+            if work.site.get("shared"):
+                work.notes["website"] = ("the verified page is on a site that belongs to a group, chain or manager; only the page itself is "
+                                         "attributed to the company (no brand, profiles, careers page or posts from that site)")
+            elif self.remaining() > 20:
+                work.posts = feed_posts(self.fetcher, ledger, verified, not_before=founded) + \
+                    jsonld_posts(ledger, verified, not_before=founded)
                 if not work.posts and self.remaining() > 20:
-                    work.posts = wordpress_posts(self.fetcher, ledger, verified)
+                    work.posts = wordpress_posts(self.fetcher, ledger, verified, not_before=founded)
                 if not work.posts:
                     extra_pages = []
                     news_url = news_page_url(verified)
@@ -313,7 +320,7 @@ class Agent:
                         result, page = self.sites._fetch_page(news_url)
                         if page is not None and host_of(result.final_url or news_url).endswith(registrable(host_of(verified.home_url))):
                             extra_pages.append((result, page))
-                    work.posts = news_items(ledger, verified, self.today, extra_pages)
+                    work.posts = news_items(ledger, verified, self.today, extra_pages, not_before=founded)
             work.states["website"] = "available" if work.site.get("claim_id") else "failed"
         elif work.site:
             pass  # registered website that refuses automated access (state and note set above)

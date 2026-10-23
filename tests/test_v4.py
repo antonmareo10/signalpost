@@ -15,8 +15,8 @@ from signalpost.agent import Agent, Work  # noqa: E402
 from signalpost.html import parse_html  # noqa: E402
 from signalpost.ledger import Document, Ledger  # noqa: E402
 from signalpost.net import FetchResult, _to_text  # noqa: E402
-from signalpost.web import (Candidate, Company, SiteResearcher, SiteResult, domain_match, feed_posts, is_wordpress,  # noqa: E402
-                            wordpress_posts)
+from signalpost.web import (Candidate, Company, SiteResearcher, SiteResult, clean_url, domain_match, extract_site,  # noqa: E402
+                            feed_posts, is_wordpress, shared_site, wordpress_posts)
 
 HOME = ("<html><head><title>Måsøval</title><meta name='generator' content='WordPress 7.0.2'>"
         "<link rel='alternate' type='application/rss+xml' href='https://www.masoval.no/feed/'></head>"
@@ -83,7 +83,7 @@ class FeedTests(unittest.TestCase):
         html = "<html><head><title>Takelund</title></head><body><img src='/wp-content/uploads/logo.png'>Takelund</body></html>"
         s = site("https://takelund.no/", html)
         self.assertTrue(is_wordpress(s))
-        api = "https://takelund.no/wp-json/wp/v2/posts?per_page=10&_fields=id,date,link,title"
+        api = "https://takelund.no/wp-json/wp/v2/posts?per_page=10&_fields=id,date,link,title,excerpt"
         data = [{"id": 7, "date": "2026-08-01T00:01:07", "link": "https://takelund.no/sommerfest/",
                  "title": {"rendered": "Sommerfest &#8211; takk for sist"}},
                 {"id": 6, "date": "2030-01-01T00:00:00", "link": "https://takelund.no/framtid/", "title": {"rendered": "Framtid"}},
@@ -185,3 +185,103 @@ class RegisteredSiteRefusingAccessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PostFilterTests(unittest.TestCase):
+    RSS = """<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Rigel</title>
+<item><title>New Client Landed</title><link>https://rigelmap.no/2013/08/29/new-client-landed/</link>
+<pubDate>Thu, 29 Aug 2013 10:00:00 +0000</pubDate><description>Some text</description></item>
+<item><title>Another post with a gallery</title><link>https://rigelmap.no/2025/06/01/gallery/</link>
+<pubDate>Sun, 01 Jun 2025 10:00:00 +0000</pubDate><description>Lorem ipsum dolor sit amet, consectetur</description></item>
+<item><title>Ny maskin levert til Statens vegvesen</title><link>https://rigelmap.no/ny-maskin/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=ny-maskin</link>
+<pubDate>Mon, 02 Jun 2025 10:00:00 +0000</pubDate><description>Vi leverte</description></item>
+</channel></rss>"""
+
+    def test_posts_before_the_company_existed_and_lorem_ipsum_are_skipped(self):
+        html = HOME.replace("https://www.masoval.no/feed/", "https://rigelmap.no/feed/")
+        fetcher = FakeFetcher({"https://rigelmap.no/feed/": lambda u: result(u, self.RSS.encode(), "application/rss+xml")})
+        posts = feed_posts(fetcher, Ledger("935342511"), site("https://rigelmap.no/", html), not_before="2025-01-20")
+        self.assertEqual([p["title"] for p in posts], ["Ny maskin levert til Statens vegvesen"])
+        self.assertEqual(posts[0]["url"], "https://rigelmap.no/ny-maskin/")
+
+    def test_clean_url_keeps_real_parameters(self):
+        self.assertEqual(clean_url("https://x.no/a/?utm_source=rss&id=7"), "https://x.no/a/?id=7")
+        self.assertEqual(clean_url("https://x.no/a/"), "https://x.no/a/")
+
+
+class SharedSiteTests(unittest.TestCase):
+    def _verified(self, url: str, html: str, proof: dict) -> SiteResult:
+        s = site(url, html)
+        s.proof = {"orgnr": None, "other_orgnrs": [], "phone": None, "email": None, "address": None, **proof}
+        return s
+
+    def test_a_dealer_page_on_a_chain_site_publishes_only_the_page(self):
+        html = ("<html><head><title>Systemhus Østenfjeldske</title><meta name='description' content='Systemhus bygger hus'></head>"
+                "<body><a href='https://www.facebook.com/systemhus'>Facebook</a> Østenfjeldske Bygg &amp; Entreprenør AS</body></html>")
+        company = Company(org="952590340", name="ØSTENFJELDSKE BYGG & ENTREPRENØR AS")
+        s = self._verified("https://www.systemhus.no/forhandlere/ostenfjeldske/", html, {})
+        self.assertTrue(shared_site(company, s))
+        ledger = Ledger(company.org)
+        info = extract_site(ledger, company, s)
+        self.assertTrue(info["shared"])
+        self.assertEqual(ledger.first("official_website")["site_scope"], "shared_site")
+        self.assertIsNone(ledger.first("social_profile"))
+        self.assertIsNone(ledger.first("website_description"))
+
+    def test_own_site_is_not_shared(self):
+        company = Company(org="933792854", name="MÅSØVAL AS")
+        self.assertFalse(shared_site(company, self._verified("https://www.masoval.no/", HOME, {})))
+        # a group site printing another organisation number, without this company's own
+        company = Company(org="984024924", name="HEGGSTADMOEN EIENDOM AS")
+        self.assertTrue(shared_site(company, self._verified("https://trv.no/", "<html><body>TRV</body></html>",
+                                                            {"other_orgnrs": ["937290658"]})))
+        # but not when it prints this company's number
+        self.assertFalse(shared_site(company, self._verified("https://trv.no/", "<html><body>TRV</body></html>",
+                                                             {"orgnr": {"url": "u", "excerpt": "984 024 924", "value": "984 024 924"},
+                                                              "other_orgnrs": ["937290658"]})))
+
+    def test_orgnr_printed_with_spaces_becomes_an_identity_proof_claim(self):
+        html = ("<html><head><title>Fram</title></head><body><h1>Frammuseet</h1><p>Polarskuta Fram og Gjøa på Bygdøy i Oslo. Åpent hver dag hele året.</p><footer>Frammuseet · Org.nr. 971 456 329</footer></body></html>")
+        company = Company(org="971456329", name="STIFTELSEN TIL BEVARELSE AV POLARSKIBET FRAM")
+        s = SiteResearcher(FakeFetcher({"https://frammuseum.no": lambda u: result(u, html.encode(), "text/html; charset=utf-8")})) \
+            .research(company, Candidate("https://frammuseum.no", "registry_website", "strong"))
+        self.assertEqual(s.state, "verified")
+        ledger = Ledger(company.org)
+        extract_site(ledger, company, s)
+        self.assertEqual(ledger.first("website_identity_proof")["value"], "971 456 329")
+
+
+class GroupSiteAndDemoTests(unittest.TestCase):
+    def test_name_overlap(self):
+        from signalpost.web import name_overlap
+        self.assertTrue(name_overlap(Company(org="1", name="VEF ENTREPRENØR AS"), "www.vef.no"))
+        self.assertTrue(name_overlap(Company(org="1", name="VARME & SANITÆR AS"), "www.v-s.no"))
+        self.assertTrue(name_overlap(Company(org="1", name="FAMILIEKIROPRAKTOREN JÆREN AS"), "www.kiroklinikken.no"))
+        self.assertTrue(name_overlap(Company(org="1", name="ADVOKATFIRMAET ØIVIND ØSTBERG AS"), "www.familierettadvokaten.no"))
+        self.assertFalse(name_overlap(Company(org="1", name="HEGGSTADMOEN EIENDOM AS"), "trv.no"))
+        self.assertFalse(name_overlap(Company(org="1", name="MARITIM RESEARCH I AS"), "www.mmanagement.no"))
+
+    def test_group_site_without_the_name_in_its_domain_is_shared(self):
+        s = site("https://trv.no/", "<html><body>TRV Gruppen · Heggstadmoen Eiendom AS</body></html>")
+        s.proof = {"orgnr": None, "other_orgnrs": []}
+        self.assertTrue(shared_site(Company(org="984024924", name="HEGGSTADMOEN EIENDOM AS"), s))
+
+    def test_theme_demo_posts_after_the_sample_post_are_skipped(self):
+        rss = """<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>The Land of The Vikings</title><link>https://ny.holokleros.no/2017/10/vikings/</link><pubDate>Sat, 14 Oct 2017 10:00:00 +0000</pubDate></item>
+<item><title>Hello world!</title><link>https://ny.holokleros.no/2017/09/hello-world/</link><pubDate>Sun, 17 Sep 2017 10:00:00 +0000</pubDate></item>
+<item><title>The Door In The Wall</title><link>https://ny.holokleros.no/2017/03/door/</link><pubDate>Tue, 14 Mar 2017 10:00:00 +0000</pubDate></item>
+<item><title>Nye åpningstider i spaet</title><link>https://ny.holokleros.no/2019/05/apningstider/</link><pubDate>Wed, 01 May 2019 10:00:00 +0000</pubDate></item>
+</channel></rss>"""
+        html = HOME.replace("https://www.masoval.no/feed/", "https://ny.holokleros.no/feed/")
+        fetcher = FakeFetcher({"https://ny.holokleros.no/feed/": lambda u: result(u, rss.encode(), "application/rss+xml")})
+        posts = feed_posts(fetcher, Ledger("983939694"), site("https://ny.holokleros.no/", html), not_before="2001-11-01")
+        self.assertEqual([p["title"] for p in posts], ["Nye åpningstider i spaet"])
+
+
+class RenamedCompanyTests(unittest.TestCase):
+    def test_a_former_name_in_the_domain_does_not_make_the_site_own(self):
+        company = Company(org="984024924", name="HEGGSTADMOEN EIENDOM AS", aliases=["TRV GRUPPEN AS", "TRONDHEIM RENHOLDSVERK AS"])
+        s = site("https://trv.no/", "<html><body>TRV Gruppen</body></html>")
+        s.proof = {"orgnr": None, "other_orgnrs": []}
+        self.assertTrue(shared_site(company, s))

@@ -14,7 +14,7 @@ import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 
@@ -402,7 +402,8 @@ class SiteResearcher:
             for match in ORG_RE.finditer(raw_text):
                 number = "".join(match.groups())
                 if number == company.org and not proof["orgnr"]:
-                    proof["orgnr"] = {"url": result.url, "excerpt": excerpt_around(raw_text, match.group(0))}
+                    # keep the number as printed ("971 456 329"): the cited excerpt must contain the claimed value
+                    proof["orgnr"] = {"url": result.url, "excerpt": excerpt_around(raw_text, match.group(0)), "value": match.group(0).strip()}
                 elif valid_orgnr(number) and number != company.org:
                     window = raw_text[max(0, match.start() - 40):match.start()].lower()
                     if re.search(r"org|foretak|mva|vat|reg", window):
@@ -792,6 +793,42 @@ def opaque_handle(url: str) -> bool:
     return bool(OPAQUE_HANDLE.search(url))
 
 
+LANG_SEGMENTS = {"no", "nb", "nn", "en", "nb-no", "en-gb", "en-us", "index.html", "index.php", "index.htm", "home", "hjem", "forside"}
+
+
+def shared_site(company: Company, site: SiteResult) -> bool:
+    """A verified page that sits on someone else's site: a franchise chain's store page (systemhus.no/forhandlere/...),
+    a kindergarten chain's page, or a group/manager site that prints another organisation number. The page names the
+    company, but the site's brand, profiles, feed and careers page belong to the chain, the group or the manager.
+    A site that prints this company's organisation number, or whose domain is named after it, is the company's own."""
+    if site.proof.get("orgnr"):
+        return False
+    host = host_of(site.home_url)
+    if domain_match(company, host)[1]:
+        return False
+    segments = [s for s in urllib.parse.urlsplit(site.home_url).path.lower().split("/") if s and s not in LANG_SEGMENTS]
+    return bool(segments) or bool(site.proof.get("other_orgnrs")) or not name_overlap(company, host)
+
+
+def name_overlap(company: Company, host: str) -> bool:
+    """Does the domain carry any piece of the company's current names (legal name, workplace brands)? A short name or its
+    initials (vef.no, v-s.no) or four letters of a name word (kiroklinikken.no for FAMILIEKIROPRAKTOREN JÆREN) count;
+    mmanagement.no for MARITIM RESEARCH I AS does not: that is the manager's site. Former names do not count either:
+    HEGGSTADMOEN EIENDOM AS was once TRV GRUPPEN AS, and trv.no now carries the successor's news, not this company's."""
+    label = domain_key(registrable(host).split(".")[0])
+    names = [company.name, *company.brands]
+    words = [domain_key(t) for name in names for t in name_tokens(name) if t]
+    if not label:
+        return False
+    if label in words:
+        return True
+    for name in names:
+        initials = domain_key("".join(t[0] for t in name_tokens(name) if t))
+        if len(initials) >= 2 and label.startswith(initials):
+            return True
+    return any(word[i:i + 4] in label for word in words if len(word) >= 4 for i in range(len(word) - 3))
+
+
 def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bool = True) -> dict[str, Any]:
     """Publish website facts from a verified site. Returns a summary used by synthesis and the UI.
 
@@ -809,7 +846,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
         if not bit or not bit.get("excerpt"):
             continue
         doc = next((d for d, _ in docs if d.url == bit["url"]), home_doc)
-        value = company.org if kind == "orgnr" else bit.get("value")
+        value = (bit.get("value") or company.org) if kind == "orgnr" else bit.get("value")
         label = {"orgnr": "organisation number", "phone": "phone number", "email": "e-mail address", "address": "business address"}[kind]
         claim = ledger.text_claim(doc, bit["excerpt"], "website", "website_identity_proof", value, qualifier=f"{site_host}:{kind}",
                                   display=f"{site_host} shows the company's registered {label}", confidence=site.confidence,
@@ -820,12 +857,20 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     home_doc.text = home_doc.text + f"\n[fetched] {site.home_url}"
     home_doc._norm_text = None
     field_name = "official_website" if primary else "additional_website"
+    shared = shared_site(company, site)
+    extra = {"discovery": site.candidate.source, "verification": site.reason, "proof_claim_ids": proof_ids}
+    if shared:
+        extra["site_scope"] = "shared_site"
+        extra["verification"] = (site.reason + "; the page is on a site that belongs to a group, chain or manager, so only this page "
+                                 "is attributed to the company")
     official = ledger.text_claim(home_doc, f"[fetched] {site.home_url}", "website", field_name, site.home_url, qualifier=site_host,
                                  display=site.home_url, confidence=site.confidence, method="identity_gate", locator="final_url",
-                                 extra={"discovery": site.candidate.source, "verification": site.reason, "proof_claim_ids": proof_ids})
+                                 extra=extra)
     if official:
         out["claim_id"] = official["id"]
-    if not primary:
+    if not primary or shared:
+        # A chain's or group's site: its brand, description, profiles, careers page, e-mail and posts are the chain's.
+        out["shared"] = shared
         return out
     # public brand: og:site_name, Organization name in JSON-LD, or the title segment that matches the domain
     brand, span = None, None
@@ -962,8 +1007,26 @@ def _entry_link(node: Any) -> str:
     return fallback
 
 
-def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10) -> list[dict[str, Any]]:
-    """Dated company-owned activity from the verified site's RSS/Atom feed (or WordPress /feed/)."""
+def clean_url(url: str) -> str:
+    """Drop campaign-tracking parameters (utm_*) that feeds append to every link."""
+    parts = urllib.parse.urlsplit(url)
+    if not parts.query:
+        return url
+    kept = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True) if not k.lower().startswith("utm_")]
+    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(kept)))
+
+
+def demo_content(text: str) -> bool:
+    """Theme demo posts ship with lorem ipsum: a date on the site, but no activity of the company."""
+    return "lorem ipsum" in fold(html_lib.unescape(text or ""))
+
+
+def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10,
+               not_before: str | None = None) -> list[dict[str, Any]]:
+    """Dated company-owned activity from the verified site's RSS/Atom feed (or WordPress /feed/).
+
+    Items dated before the company was founded (``not_before``) are a predecessor's or a theme's demo content, so they are
+    skipped, as are lorem-ipsum demo posts and WordPress's install-time sample post."""
     home_page = site.pages[0][1]
     site_host = host_of(site.home_url)
     feeds = [f for f in home_page.feeds if "comment" not in f.lower() and host_of(f).endswith(registrable(site_host))]
@@ -973,16 +1036,17 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
     for feed_url in feeds[:1]:
         result = fetcher.get(feed_url, accept="application/rss+xml, application/atom+xml, application/xml, text/xml",
                              respect_robots=True, max_bytes=2_000_000, timeout=12)
-        if not result.ok or not result.text.lstrip().lstrip("﻿").startswith(("<?xml", "<rss", "<feed", "<rdf")):
+        if not result.ok or not result.text.lstrip().lstrip("\ufeff").startswith(("<?xml", "<rss", "<feed", "<rdf")):
             continue
         try:
             root = ET.fromstring(result.body or result.text.encode("utf-8"))
         except ET.ParseError:
             try:
-                root = ET.fromstring(result.text.lstrip("﻿").encode("utf-8"))
+                root = ET.fromstring(result.text.lstrip("\ufeff").encode("utf-8"))
             except ET.ParseError:
                 continue
         items = []
+        sample_dates: list[str] = []
         for node in root.iter():
             tag = node.tag.split("}")[-1]
             if tag not in {"item", "entry"}:
@@ -1001,9 +1065,15 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
             except (TypeError, ValueError, IndexError):
                 match = re.match(r"(\d{4}-\d{2}-\d{2})", raw_date)
                 iso = match.group(1) if match else None
+            body_node = _first_child(fields, "description", "summary", "encoded", "content")
+            body = "".join(body_node.itertext()) if body_node is not None else ""
+            if title and iso and placeholder_post(title):
+                sample_dates.append(iso)
+                continue
             if title and link and iso and iso <= _today() and host_of(link).endswith(registrable(site_host)) \
-                    and not placeholder_post(title):
+                    and not demo_content(body) and not (not_before and iso < not_before):
                 items.append((iso, title, link, raw_date))
+        items = [item for item in items if not after_install_demo(item[0], sample_dates)]
         items.sort(reverse=True)
         lines = []
         for iso, title, link, raw_date in items:
@@ -1011,12 +1081,13 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
         doc = Document(url=feed_url, source_class="company_owned_feed", retrieved_at=result.retrieved_at, sha256=result.sha256,
                        text="\n".join(lines), final_url=result.final_url)
         for iso, title, link, raw_date in items[:limit]:
+            url = clean_url(link)
             claim = ledger.text_claim(doc, f"[feed item] {title} | {link} | {raw_date}", "activity", "website_post",
-                                      {"title": title, "url": link, "published": raw_date}, qualifier=link,
+                                      {"title": title, "url": url, "published": raw_date}, qualifier=url,
                                       display=f"{iso} — {title}", effective_at=iso, confidence=0.95, method="rss_atom_feed",
-                                      extra={"event_date": iso, "url": link})
+                                      extra={"event_date": iso, "url": url})
             if claim:
-                posts.append({"date": iso, "title": title, "url": link, "claim_id": claim["id"]})
+                posts.append({"date": iso, "title": title, "url": url, "claim_id": claim["id"]})
     return posts
 
 
@@ -1033,20 +1104,31 @@ def placeholder_post(title: str) -> bool:
     return " ".join(tokens(title)) in PLACEHOLDER_POSTS
 
 
-def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10) -> list[dict[str, Any]]:
+def after_install_demo(iso: str, sample_dates: list[str], days: int = 60) -> bool:
+    """A site that still carries WordPress's sample post was set up from a theme: posts dated up to two months after that
+    sample post are the theme's demo import (public-domain stories dated the 14th of each month), not the company's news."""
+    if not sample_dates:
+        return False
+    cutoff = (datetime.fromisoformat(max(sample_dates)) + timedelta(days=days)).date().isoformat()
+    return iso <= cutoff
+
+
+def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10,
+                    not_before: str | None = None) -> list[dict[str, Any]]:
     """Dated posts from the verified site's own WordPress REST API (``/wp-json/wp/v2/posts``), for WordPress sites whose
     pages do not advertise a feed. The endpoint is part of the company's site and robots.txt is honoured; each claim cites a
-    JSON pointer into the stored response."""
+    JSON pointer into the stored response. Same filters as the feed: no sample post, no lorem ipsum, nothing dated
+    before the company was founded."""
     if not is_wordpress(site):
         return []
     parts = urllib.parse.urlsplit(site.pages[0][0].final_url or site.home_url)
     base = f"{parts.scheme}://{parts.netloc}"
-    url = f"{base}/wp-json/wp/v2/posts?per_page={limit}&_fields=id,date,link,title"
+    url = f"{base}/wp-json/wp/v2/posts?per_page={limit}&_fields=id,date,link,title,excerpt"
     result = fetcher.get(url, accept="application/json", respect_robots=True, max_bytes=1_000_000, timeout=12)
     if not result.ok or not host_of(result.final_url or url).endswith(registrable(host_of(site.home_url))):
         return []
     try:
-        data = json.loads(result.text.lstrip("﻿"))
+        data = json.loads(result.text.lstrip("\ufeff"))
     except ValueError:
         return []
     if not isinstance(data, list):
@@ -1055,26 +1137,36 @@ def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: i
                    text=canonical_json(data), data=data, final_url=result.final_url)
     site_root = registrable(host_of(site.home_url))
     posts: list[dict[str, Any]] = []
+
+    def title_of(item: dict[str, Any]) -> str:
+        rendered = (item.get("title") or {}).get("rendered") if isinstance(item.get("title"), dict) else item.get("title")
+        return re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", str(rendered or "")))).strip()
+
+    sample_dates = [str(item.get("date") or "")[:10] for item in data if isinstance(item, dict) and placeholder_post(title_of(item))]
     for index, item in enumerate(data[:limit]):
         if not isinstance(item, dict):
             continue
-        rendered = (item.get("title") or {}).get("rendered") if isinstance(item.get("title"), dict) else item.get("title")
-        title = re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", str(rendered or "")))).strip()
+        title = title_of(item)
         link = str(item.get("link") or "")
         raw_date = str(item.get("date") or "")
         iso = raw_date[:10]
+        excerpt = item.get("excerpt") or {}
+        excerpt_text = str(excerpt.get("rendered") if isinstance(excerpt, dict) else excerpt or "")
         if not (title and link and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) and iso <= _today() and host_of(link).endswith(site_root)) \
-                or placeholder_post(title):
+                or placeholder_post(title) or demo_content(excerpt_text) or (not_before and iso < not_before) \
+                or after_install_demo(iso, [d for d in sample_dates if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)]):
             continue
+        link = clean_url(link)
         claim = ledger.json_claim(doc, f"/{index}", "activity", "website_post", value={"title": title, "url": link, "published": raw_date},
                                   qualifier=link, display=f"{iso} — {title}", effective_at=iso, confidence=0.95,
-                                  method="wordpress_rest_api", extra={"event_date": iso, "url": link})
+                                  method="wordpress_rest_api", extra={"event_date": iso, "url": link},
+                                  span_keys=("date", "link", "title"))
         if claim:
             posts.append({"date": iso, "title": title, "url": link, "claim_id": claim["id"]})
     return posts
 
 
-def jsonld_posts(ledger: Ledger, site: SiteResult) -> list[dict[str, Any]]:
+def jsonld_posts(ledger: Ledger, site: SiteResult, not_before: str | None = None) -> list[dict[str, Any]]:
     """Dated articles declared in JSON-LD on crawled pages (NewsArticle/BlogPosting/Article/Event)."""
     posts = []
     docs = page_documents(site.pages, "company_owned_website")
@@ -1094,7 +1186,7 @@ def jsonld_posts(ledger: Ledger, site: SiteResult) -> list[dict[str, Any]]:
             url = str(item.get("url") or (main_entity.get("@id", "") if isinstance(main_entity, dict) else main_entity or ""))
             if url and not host_of(url).endswith(registrable(host_of(site.home_url))):
                 continue
-            if not (title and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)):
+            if not (title and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)) or placeholder_post(title) or (not_before and date < not_before):
                 continue
             line = next((l for l in doc.text.split("\n") if l.startswith("[json-ld]") and title[:40] in l and date in l), None)
             if not line:
@@ -1143,7 +1235,7 @@ NEWS_PATH = re.compile(r"(nyhet|aktuelt|news|blogg|blog|presse|artikl|article|in
 
 
 def news_items(ledger: Ledger, site: SiteResult, today: str, extra_pages: list[tuple[FetchResult, Page]] | None = None,
-               limit: int = 8) -> list[dict[str, Any]]:
+               limit: int = 8, not_before: str | None = None) -> list[dict[str, Any]]:
     """Dated news teasers on the verified site.
 
     Conservative pairing: the date must be inside the link text, or be the only date on the line directly
@@ -1195,7 +1287,7 @@ def news_items(ledger: Ledger, site: SiteResult, today: str, extra_pages: list[t
             if j is not None and used.get(j, 0) > 1:
                 continue
             title = re.sub(r"\s+", " ", text.replace(raw_date, " ")).strip(" -–|·,") if raw_date in text else text
-            if len(title) < 10 or url in seen:
+            if len(title) < 10 or url in seen or (not_before and iso < not_before):
                 continue
             seen.add(url)
             claim = ledger.text_claim(doc, window[:480], "activity", "website_post", {"title": title[:80], "published": raw_date},
