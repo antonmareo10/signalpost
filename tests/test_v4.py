@@ -26,6 +26,7 @@ RSS = """<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><titl
 <pubDate>Thu, 21 Aug 2025 10:14:52 +0000</pubDate><description>Vi har valgt å fokusere STRAY</description></item>
 <item><title>Bygg &amp; anlegg</title><link>https://www.masoval.no/artikler/bygg/</link><pubDate>Mon, 02 Jun 2025 08:00:00 +0000</pubDate></item>
 <item><title>Annet nettsted</title><link>https://example.com/x</link><pubDate>Mon, 02 Jun 2025 08:00:00 +0000</pubDate></item>
+<item><title>Hei, verden!</title><link>https://www.masoval.no/hei-verden/</link><pubDate>Mon, 03 Mar 2014 08:00:00 +0000</pubDate></item>
 </channel></rss>"""
 ATOM = """<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Blogg</title>
 <entry><title>Ny avdeling i Bergen</title><link rel="replies" href="https://firma.no/ny-avdeling/#comments"/>

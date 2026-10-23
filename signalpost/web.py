@@ -1001,7 +1001,8 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
             except (TypeError, ValueError, IndexError):
                 match = re.match(r"(\d{4}-\d{2}-\d{2})", raw_date)
                 iso = match.group(1) if match else None
-            if title and link and iso and iso <= _today() and host_of(link).endswith(registrable(site_host)):
+            if title and link and iso and iso <= _today() and host_of(link).endswith(registrable(site_host)) \
+                    and not placeholder_post(title):
                 items.append((iso, title, link, raw_date))
         items.sort(reverse=True)
         lines = []
@@ -1021,6 +1022,15 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
 
 def _today() -> str:
     return datetime.now(timezone.utc).date().isoformat()
+
+
+# The sample post WordPress creates on installation ("Hello world!", "Hei, verden!"): a date, but no activity.
+PLACEHOLDER_POSTS = {"hello world", "hei verden", "hallo verden", "hej verden", "hej varlden", "hallo welt", "hola mundo",
+                     "bonjour tout le monde", "ciao mondo", "ola mundo", "hei maailma", "witaj swiecie"}
+
+
+def placeholder_post(title: str) -> bool:
+    return " ".join(tokens(title)) in PLACEHOLDER_POSTS
 
 
 def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10) -> list[dict[str, Any]]:
@@ -1053,7 +1063,8 @@ def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: i
         link = str(item.get("link") or "")
         raw_date = str(item.get("date") or "")
         iso = raw_date[:10]
-        if not (title and link and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) and iso <= _today() and host_of(link).endswith(site_root)):
+        if not (title and link and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) and iso <= _today() and host_of(link).endswith(site_root)) \
+                or placeholder_post(title):
             continue
         claim = ledger.json_claim(doc, f"/{index}", "activity", "website_post", value={"title": title, "url": link, "published": raw_date},
                                   qualifier=link, display=f"{iso} — {title}", effective_at=iso, confidence=0.95,
