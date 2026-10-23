@@ -1,7 +1,69 @@
-# Evaluation (local, 21–22 Oct 2026)
+# Evaluation (local, 21–23 Oct 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.3.0 (23 Oct): dated posts are published, and chain or group sites stop lending their content
+
+Same 1,000 random companies (seed 1000), 1.2.0 and 1.3.0 run back to back on 23 Oct, keyless, 24 workers:
+
+| Family | 1.2.0: companies / facts | 1.3.0: companies / facts |
+|---|---|---|
+| Dated own-channel posts | 7 / 32 | **29 / 211** |
+| Verified website | 116 / 118 | **120 / 122** |
+| Company-owned social profiles | 77 / 154 | 73 / 141 (13 chain, group or manager profiles removed, none added) |
+| Careers page or job ads | 23 / 25 | 21 / 25 (2 more NAV ads; 2 careers pages of a chain and of a group removed) |
+| Website section `blocked` | 27 | 8 (the others were domains that no longer resolve, now `not_available`) |
+| Requests | 8,392 | 8,438 |
+
+Both runs passed contract validation. Evidence audit on the 1.3.0 run: 95,630 / 95,630 excerpts re-found in their stored
+snapshots (plus 8 NAV ads, verified against their stored projection by design). Wall clock depends on the register's
+response times that day (926 s for 1.2.0 at 15:00, 2,025 s for 1.3.0 at 16:15 with the same request count).
+
+What changed, and what each change did on this batch:
+- **RSS and Atom posts.** Every feed item was dropped before: ElementTree treats an element without children, such as
+  `<pubDate>`, as false, so `pubDate or published or ...` skipped the date. Atom entries now use the `rel="alternate"`
+  link; up to 10 items, nothing dated in the future, `utm_*` parameters removed from links.
+- **WordPress REST API.** A WordPress site that advertises no feed is asked for `/wp-json/wp/v2/posts` (robots.txt
+  honoured); each post cites a JSON pointer into the stored response.
+- **What is not activity.** Posts dated before the company was founded (rigelmap.no showed 2013 posts for a company
+  founded in 2025; bcaccounting.no showed posts from before its founding), lorem-ipsum excerpts, WordPress's sample post
+  ("Hello world!", "Hei, verden!": 7 in this batch) and the theme demo posts dated up to two months after it
+  (public-domain stories on ny.holokleros.no).
+- **Shared sites.** When the verified page sits on someone else's site, only the page is published, labelled
+  `site_scope: shared_site`; the brand, description, profiles, careers page and posts there belong to the chain, the
+  group or the manager. A page is shared when it is a sub-page (systemhus.no/forhandlere/..., laringsverkstedet.no/barnehage/...,
+  drommekjokkenet.no/alnabru/), when the site prints another organisation number, or when its domain carries none of
+  the company's current names (mmanagement.no for MARITIM RESEARCH I AS, sushibrodrene.no for POWER BOOTCAMP AS), and
+  in every case only when the site does not print the company's own organisation number. Former names do not count:
+  HEGGSTADMOEN EIENDOM AS was TRV GRUPPEN AS and still lists trvgruppen.no, so 1.2.0 gave it TRV's news feed, social
+  profiles and careers page. A profile on a shared page is kept only when its handle carries two of the company's own name
+  words, one of them not the site's (facebook.com/ostenfjeldskebygg on the Systemhus dealer page,
+  instagram.com/froyland.gardsbarnehage on the Læringsverkstedet page).
+- **Registered websites that refuse bots.** highsoft.com, sunnokonomi.no, hovelmesteren.no and geoprovider.no are listed
+  by the companies themselves in the register, are named after them, and answer robots.txt or HTTP 403 to an automated
+  client. They are now published from the register listing (`basis: registry_listing`), with nothing read from them.
+- **NAV.** Store numbers no longer stop an ad from being looked up: "NARVESEN BUTIKKEN 600" advertises as "Narvesen
+  Harstad Sykehus" (2 ads). Resolving every one of the 9,955 active ads to its employer number on this batch found the
+  same 4 companies and 8 ads, so the name-based lookup now misses none here.
+- **States and evidence.** A domain that does not resolve with or without `www` is reported as gone (`not_available`),
+  not `blocked`. A UTF-8 page with one stray byte (WordPress cuts excerpts in the middle of an "å") no longer becomes
+  cp1252 mojibake. The organisation-number proof keeps the number as printed ("971 456 329"), so its claim is no longer
+  dropped by the evidence check.
+- **Refresh.** A copies list that could not be read keeps the previous run's documents, and a register name search that
+  does not answer makes the website section `failed` (previous value kept) instead of rejecting the site. Both showed
+  up as false "new" changes on a smoke-test pass while the register was slow.
+
+Hand review of 50 new facts on the 1.3.0 run (all 4 new websites, both new job ads, and 44 new posts, at most 2 per
+company, from 23 companies): 50 belong to the company and carry the date the source gives. Every post is on the
+company's verified domain and its title is on the linked page; for 9 posts the page itself prints no date, and the date
+comes from the feed or the WordPress API that is cited. An earlier review of the first 1.3.0 run is what found the
+problems fixed above (TRV's news, posts older than the company, theme demo posts).
+
+Smoke test (`samples/smoke-100.jsonl`, three passes, 23 Oct, committed in `docs/smoke/`): 100/100 envelopes, validation
+passed on every pass, third pass 0 changes and 0 carried-forward claims, evidence audit 9,390 / 9,390 excerpts re-found.
+4 companies now have 35 dated posts (none in 1.2.0). Verified websites 9 (10 with 1.2.0): supermercado.no answered
+HTTP 429 to all three passes after a day of test runs, and a refusal is never published. 80 offline unit tests.
 
 ## Version 1.2.0 (22 Oct): more websites, and three wrong-site cases closed
 

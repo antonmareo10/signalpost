@@ -1,9 +1,9 @@
 {
-  "run_id": "run-20261022T132323Z",
-  "agent_version": "1.2.0",
-  "started_at": "2026-10-22T13:23:23Z",
-  "completed_at": "2026-10-22T13:25:30Z",
-  "wall_clock_seconds": 127.2,
+  "run_id": "run-20261023T153214Z",
+  "agent_version": "1.3.0",
+  "started_at": "2026-10-23T15:32:16Z",
+  "completed_at": "2026-10-23T15:43:26Z",
+  "wall_clock_seconds": 672.0,
   "inputs": 100,
   "emitted_envelopes": 100,
   "status_counts": {
@@ -20,10 +20,9 @@
       "available": 100
     },
     "website": {
-      "available": 10,
-      "not_available": 87,
+      "available": 9,
+      "not_available": 89,
       "ambiguous": 1,
-      "blocked": 1,
       "failed": 1
     },
     "hiring": {
@@ -46,9 +45,9 @@
       "claims": 201
     },
     "brand": {
-      "companies": 4,
-      "company_share": 0.04,
-      "claims": 4
+      "companies": 3,
+      "company_share": 0.03,
+      "claims": 3
     },
     "company_profiles": {
       "companies": 4,
@@ -56,9 +55,9 @@
       "claims": 8
     },
     "dated_activity": {
-      "companies": 0,
-      "company_share": 0.0,
-      "claims": 0
+      "companies": 4,
+      "company_share": 0.04,
+      "claims": 35
     },
     "description": {
       "companies": 6,
@@ -91,9 +90,9 @@
       "claims": 495
     },
     "website": {
-      "companies": 10,
-      "company_share": 0.1,
-      "claims": 10
+      "companies": 9,
+      "company_share": 0.09,
+      "claims": 9
     },
     "workplaces": {
       "companies": 74,
@@ -102,21 +101,21 @@
     }
   },
   "operations": {
-    "requests": 1007,
-    "bytes": 109030014,
-    "p50_request_ms": 687,
-    "p95_request_ms": 2625,
-    "p50_company_ms": 8250,
-    "p95_company_ms": 15827,
+    "requests": 992,
+    "bytes": 96323983,
+    "p50_request_ms": 545,
+    "p95_request_ms": 15030,
+    "p50_company_ms": 31922,
+    "p95_company_ms": 62687,
     "third_party_cost_usd": 0.0,
     "search_provider": null,
     "search_calls": 0,
     "nav_feed": {
       "state": "available",
-      "pages": 183,
-      "active_ads": 9892,
+      "pages": 160,
+      "active_ads": 9056,
       "matched_companies": 0,
-      "error": null
+      "error": "feed loading stopped after 200s (160 pages); older active ads may be missing"
     },
     "annual_account_copies": {
       "lists_fetched": 100,
@@ -125,13 +124,13 @@
     },
     "top_hosts": {
       "data.brreg.no": 611,
-      "pam-stilling-feed.nav.no": 184,
+      "pam-stilling-feed.nav.no": 167,
       "www.aelektronikk.no": 6,
       "7-eleven.no": 6,
       "devoldsregnskap.no": 6,
       "stronen.no": 5,
       "svorka.no": 5,
-      "supermercado.no": 5
+      "bakkeneiendom.no": 5
     }
   },
   "validation": {
@@ -145,6 +144,6 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "previous_envelopes": "run-20261022T132105Z.jsonl",
+  "previous_envelopes": "run-20261023T152537Z.jsonl",
   "viewer": "site/index.html"
 }
