@@ -24,8 +24,10 @@ from .registry import (IndustryLabels, account_claims, account_copy_claims, enti
                        update_claims)
 from .search import SearchProvider
 from .synth import build_summary
-from .web import (FREEMAIL, LOW_ACTIVITY, Candidate, Company, SiteResearcher, candidate_slugs, extract_site, feed_posts, handle_matches,
-                  host_of, jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits, registrable)
+from .ledger import supports
+from .web import (FREEMAIL, LOW_ACTIVITY, Candidate, Company, SiteResearcher, candidate_slugs, domain_match, extract_site, feed_posts,
+                  handle_matches, host_of, jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits,
+                  registrable, wordpress_posts)
 
 SECTIONS = ("identity", "accounts", "people", "website", "hiring", "activity")
 SMALL_ACTIVE_REVENUE = 100_000  # NOK: below this a company with no employees is treated as dormant (no domain guessing)
@@ -240,6 +242,8 @@ class Agent:
         related = None
         unreachable_own = False
         blocked = False
+        gone_own = False
+        refused_own: list[tuple[Candidate, Any]] = []
         candidates = self.candidates(work)
         tried_search = False
         index = 0
@@ -282,6 +286,17 @@ class Agent:
                 unreachable_own = True  # network failure on the company's own registered domain: we could not check
             if result.state == "blocked" and candidate.strength in ("strong", "medium"):
                 blocked = True  # a refused *guess* says nothing about the company's own site
+                if candidate.source in ("registry_website", "registry_email_domain"):
+                    refused_own.append((candidate, result))
+            if result.state == "gone" and candidate.strength in ("strong", "medium"):
+                gone_own = True
+        if verified is None and refused_own:
+            verified_listing = self._registered_site_refusing_access(work, refused_own)
+            if verified_listing:
+                work.site = verified_listing
+                work.states["website"] = "available"
+                work.notes["website"] = ("the website is the one the company lists in the Brønnøysund register and is named after it; the "
+                                         "site refuses automated access, so its pages (profiles, posts) were not read")
         if verified:
             work.site = extract_site(ledger, company, verified)
             for extra in extra_sites:
@@ -289,6 +304,8 @@ class Agent:
                 work.site.setdefault("additional", []).append({"url": extra_info["url"], "claim_id": extra_info.get("claim_id")})
             if self.remaining() > 20:
                 work.posts = feed_posts(self.fetcher, ledger, verified) + jsonld_posts(ledger, verified)
+                if not work.posts and self.remaining() > 20:
+                    work.posts = wordpress_posts(self.fetcher, ledger, verified)
                 if not work.posts:
                     extra_pages = []
                     news_url = news_page_url(verified)
@@ -298,6 +315,8 @@ class Agent:
                             extra_pages.append((result, page))
                     work.posts = news_items(ledger, verified, self.today, extra_pages)
             work.states["website"] = "available" if work.site.get("claim_id") else "failed"
+        elif work.site:
+            pass  # registered website that refuses automated access (state and note set above)
         elif related:
             work.states["website"] = "ambiguous"
             work.notes["website"] = f"{related.home_url}: {related.reason}"
@@ -311,6 +330,8 @@ class Agent:
             work.states["website"] = "not_available"
             if not candidates:
                 work.notes["website"] = "no website listed in the register and no verifiable candidate"
+            elif gone_own:
+                work.notes["website"] = "the domain listed in the register (website or e-mail) no longer resolves; no other candidate could be tied to this exact legal entity"
             else:
                 work.notes["website"] = "candidates checked but none could be tied to this exact legal entity"
         # hiring
@@ -327,6 +348,47 @@ class Agent:
             work.notes["hiring"] = f"NAV job feed unavailable: {self.nav.error}"
         activity = ledger.section_claims("activity")
         work.states["activity"] = "available" if activity else "not_available"
+
+    @staticmethod
+    def _registered_site_refusing_access(work: Work, refused: list[tuple[Candidate, Any]]) -> dict[str, Any] | None:
+        """The website the company itself lists in the register (or the domain of its registered e-mail address) answers
+        but refuses automated access (robots.txt or HTTP 401/403/429), so the identity gate cannot read it.
+
+        The register listing is then the evidence, and only when the domain is named after the company (the whole legal
+        name for an e-mail domain): a manager's, accountant's, group's or web host's domain is never published this way.
+        Its pages are not read, so no brand, profile, careers page or post comes from it."""
+        company, ledger = work.company, work.ledger
+        assert company is not None
+        for candidate, result in refused:
+            reason = result.reason or ""
+            if not (reason.startswith("robots.txt") or "refused automated access" in reason):
+                continue
+            host = host_of(candidate.url)
+            full, named = domain_match(company, host)
+            if candidate.source == "registry_website":
+                listing = ledger.first("registered_website")
+                listed_host = host_of(normalize_site_url(str((listing or {}).get("value") or "")) or "")
+                ok = named and listing is not None and registrable(listed_host) == registrable(host)
+            else:
+                listing = ledger.first("registered_email")
+                listed_domain = str((listing or {}).get("value") or "").split("@")[-1].lower()
+                ok = full and listing is not None and registrable(listed_domain) == registrable(host)
+            if not ok or listing is None:
+                continue
+            ev_id = listing["evidence_ids"][0]
+            if not supports(candidate.url, ledger.evidence[ev_id]["claim_span"]):
+                continue
+            what = "website" if candidate.source == "registry_website" else "e-mail domain"
+            claim = ledger._accept("website", "official_website", candidate.url, ev_id, qualifier=host, display=candidate.url,
+                                   period=None, effective_at=None, confidence=0.85,
+                                   extra={"discovery": candidate.source, "basis": "registry_listing", "site_access": "refused",
+                                          "verification": f"the {what} the company lists in the Brønnøysund register, named after the company; "
+                                                          f"the site refuses automated access ({reason}), so its pages were not read",
+                                          "proof_claim_ids": [listing["id"]]})
+            if claim:
+                return {"url": candidate.url, "host": host, "profiles": [], "careers": [], "posts": [], "brand": None,
+                        "description": None, "claim_id": claim["id"], "access": "refused"}
+        return None
 
     @staticmethod
     def _more_sites_worthwhile(candidates: list[Candidate], index: int) -> bool:

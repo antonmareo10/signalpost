@@ -276,7 +276,10 @@ def build_summary(ledger: Ledger, ctx: dict[str, Any]) -> dict[str, Any]:
                                 [w["id"] for w in workplaces], {"n": float(len(workplaces))}))
     site = first("official_website")
     profiles = ledger.by_field("social_profile")
-    if site:
+    if site and site.get("basis") == "registry_listing":
+        people.append(_sentence(f"Its website, as listed in the Brønnøysund register, is {site['value']}; the site refuses automated "
+                                f"access, so its pages were not read.", [site["id"]]))
+    elif site:
         proof = first("website_identity_proof")
         text = f"Its verified website is {site['value']}"
         ids = [site["id"]]

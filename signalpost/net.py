@@ -309,6 +309,14 @@ def _to_text(body: bytes, content_type: str) -> str:
             continue
         try:
             return body.decode(candidate)
-        except (LookupError, UnicodeDecodeError):
+        except LookupError:
+            continue
+        except UnicodeDecodeError:
+            # One stray byte (WordPress cuts feed excerpts in the middle of an "å") must not turn a whole UTF-8 document
+            # into cp1252 mojibake: keep UTF-8 when the damage is a handful of characters.
+            if candidate.lower().replace("_", "-") in ("utf-8", "utf8"):
+                text = body.decode("utf-8", "replace")
+                if text.count("�") <= max(3, len(body) // 2000):
+                    return text
             continue
     return body.decode("utf-8", "replace")

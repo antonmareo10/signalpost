@@ -25,11 +25,14 @@ BASE = "https://pam-stilling-feed.nav.no"
 TOKEN_URL = BASE + "/api/publicToken"
 FEED_URL = BASE + "/api/v1/feed"
 AD_PUBLIC_URL = "https://arbeidsplassen.nav.no/stillinger/stilling/{uuid}"
-GENERIC_EMPLOYER = {"as", "asa", "sa", "avd", "avdeling", "og", "i", "the", "kommune", "norge", "anonym", "arbeidsgiver", "da", "ans"}
+GENERIC_EMPLOYER = {"as", "asa", "sa", "avd", "avdeling", "og", "i", "the", "kommune", "norge", "anonym", "arbeidsgiver", "da", "ans",
+                    "butikk", "butikken", "filial"}
 
 
 def _name_key(name: str) -> frozenset[str]:
-    return frozenset(t for t in tokens(name) if t not in GENERIC_EMPLOYER and len(t) > 1)
+    """Words that name an employer. Store numbers ("NARVESEN BUTIKKEN 600") are dropped: the ad says "Narvesen Harstad
+    Sykehus". The key only picks ads to look up; an ad is attributed by its employer organisation number alone."""
+    return frozenset(t for t in tokens(name) if t not in GENERIC_EMPLOYER and len(t) > 1 and not t.isdigit())
 
 
 class NavJobs:

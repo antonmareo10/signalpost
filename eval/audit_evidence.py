@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import html
 import json
+import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
 
@@ -19,6 +22,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from signalpost.html import parse_html  # noqa: E402
 from signalpost.ledger import canonical_json, resolve_pointer, squash, supports  # noqa: E402
 from signalpost.net import _to_text  # noqa: E402
+
+
+def feed_titles(body: bytes) -> set[str]:
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError:
+        try:
+            root = ET.fromstring(_to_text(body, "").lstrip("﻿").encode("utf-8"))
+        except ET.ParseError:
+            return set()
+    titles = set()
+    for node in root.iter():
+        if node.tag.split("}")[-1] in ("item", "entry"):
+            for child in node:
+                if child.tag.split("}")[-1] == "title":
+                    titles.add(re.sub(r"\s+", " ", html.unescape(child.text or "")).strip())
+    return titles
 
 
 def main() -> None:
@@ -50,7 +70,7 @@ def main() -> None:
             ok = False
             if ev["locator"].startswith("/") or (ev["locator"] == "" and ev["source_class"].startswith("official")):
                 try:
-                    found = resolve_pointer(json.loads(raw), ev["locator"])
+                    found = resolve_pointer(json.loads(raw.lstrip("﻿")), ev["locator"])
                     text = found if isinstance(found, str) else canonical_json(found)
                     ok = squash(span)[:200] in squash(text) or squash(text) in squash(span) or \
                         all(supports(c["value"], text) for c in claims_by_ev.get(ev["id"], []))
@@ -59,8 +79,10 @@ def main() -> None:
             elif ev["locator"] == "final_url":
                 ok = True  # the fetch record itself (URL, time, hash) is the evidence
             else:
-                if raw.lstrip().startswith(("<?xml", "<rss", "<feed")):
-                    ok = all(part.strip()[:60] in raw for part in span.replace("[feed item]", "").split("|")[:1])
+                if raw.lstrip().lstrip("﻿").startswith(("<?xml", "<rss", "<feed", "<rdf")):
+                    # the cited title must be one of the feed's item titles (entities decoded, spaces collapsed)
+                    title = span.replace("[feed item]", "").split("|")[0].strip()
+                    ok = title[:60] in raw or title in feed_titles(body)
                 else:
                     page = parse_html(raw, ev["final_url"] or ev["source_url"])
                     ok = squash(span) in squash(page.evidence_text())

@@ -7,16 +7,19 @@ the candidate's origin gets weaker (registry-listed > registry e-mail domain > g
 """
 from __future__ import annotations
 
+import html as html_lib
+import json
 import re
 import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 
 from .html import Page, parse_html
-from .ledger import Document, Ledger, excerpt_around, fold, tokens
+from .ledger import Document, Ledger, canonical_json, excerpt_around, fold, tokens
 from .net import Fetcher, FetchResult
 
 LEGAL_FORMS = {"as", "asa", "sa", "da", "ans", "nuf", "ba", "ks", "enk", "sti", "iks", "kf", "hf", "bl", "ab", "ltd", "limited",
@@ -269,6 +272,20 @@ def candidate_slugs(company: Company) -> list[str]:
     return out
 
 
+def domain_match(company: Company, host: str) -> tuple[bool, bool]:
+    """(full, named): does the registrable domain spell the whole legal name (``full``), or at least all of its
+    distinctive words (``named``)? "highsoft.com" is HIGHSOFT AS in full; "canon.no" only names CANON NORGE AS."""
+    label = domain_key(registrable(host).split(".")[0])
+    core = company.core
+    joined = domain_key("".join(core))
+    joined_full = domain_key("".join(name_tokens_with_connectors(company.name)))
+    dist = [domain_key(t) for t in distinctive(core)]
+    full = bool(joined and (label == joined or (len(joined) >= 6 and joined in label))) or \
+        bool(joined_full and len(joined_full) >= 6 and label == joined_full)
+    named = full or bool(dist and all(t in label for t in dist) and sum(len(t) for t in dist) >= 5)
+    return full, named
+
+
 def page_documents(pages: list[tuple[FetchResult, Page]], source_class: str) -> list[tuple[Document, Page]]:
     docs = []
     for result, page in pages:
@@ -307,6 +324,10 @@ class SiteResearcher:
                         (alt_result.blocked and "robots" in (alt_result.error or "")):
                     result, home = alt_result, alt_home
                     break
+        if result.blocked and (result.error or "").startswith("unsafe_url: hostname did not resolve"):
+            # No DNS record for the name, with or without "www": the domain is gone. Nothing refused us, so this is not
+            # "blocked"; the company simply has no site there.
+            return SiteResult(candidate, "gone", "the domain does not resolve (no DNS record, with or without www)")
         if result.blocked:
             return SiteResult(candidate, "blocked", result.error or "blocked")
         if result.status in (401, 403, 429):
@@ -478,14 +499,8 @@ class SiteResearcher:
         return unique
 
     def _decide(self, company: Company, candidate: Candidate, proof: dict[str, Any], final_host: str) -> tuple[str, float, str]:
-        label = domain_key(registrable(final_host).split(".")[0])
         core = company.core
-        joined = domain_key("".join(core))
-        joined_full = domain_key("".join(name_tokens_with_connectors(company.name)))
-        dist = [domain_key(t) for t in distinctive(core)]
-        full_match = bool(joined and (label == joined or (len(joined) >= 6 and joined in label))) or \
-            bool(joined_full and len(joined_full) >= 6 and label == joined_full)
-        domain_name = full_match or bool(dist and all(t in label for t in dist) and sum(len(t) for t in dist) >= 5)
+        full_match, domain_name = domain_match(company, final_host)
         proof["domain_name"] = domain_name
         contact = proof["phone"] or proof["email"] or proof["address"]
         foreign = bool(proof["other_orgnrs"]) and not proof["orgnr"]
@@ -911,36 +926,67 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     return out
 
 
-def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 8) -> list[dict[str, Any]]:
+def is_wordpress(site: SiteResult) -> bool:
+    """WordPress sites often drop the generator tag; their asset paths still give them away."""
+    result, home = site.pages[0]
+    return "wordpress" in home.meta.get("generator", "").lower() or "/wp-content/" in (result.text or "") \
+        or "/wp-json/" in (result.text or "")
+
+
+def _first_child(fields: dict[str, Any], *names: str) -> Any:
+    # ElementTree elements without children are falsy, so `a or b` would skip a present <pubDate>: test for None.
+    for name in names:
+        node = fields.get(name)
+        if node is not None:
+            return node
+    return None
+
+
+def _entry_link(node: Any) -> str:
+    """RSS <link>text</link>, or the Atom <link href> whose rel is "alternate" (or unset)."""
+    fallback = ""
+    for child in node:
+        if child.tag.split("}")[-1] != "link":
+            continue
+        href = (child.attrib.get("href") or child.text or "").strip()
+        if href and child.attrib.get("rel", "alternate") == "alternate":
+            return href
+        fallback = fallback or href
+    return fallback
+
+
+def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10) -> list[dict[str, Any]]:
     """Dated company-owned activity from the verified site's RSS/Atom feed (or WordPress /feed/)."""
     home_page = site.pages[0][1]
     site_host = host_of(site.home_url)
     feeds = [f for f in home_page.feeds if "comment" not in f.lower() and host_of(f).endswith(registrable(site_host))]
-    generator = home_page.meta.get("generator", "").lower()
-    if not feeds and "wordpress" in generator:
+    if not feeds and is_wordpress(site):
         feeds = [urllib.parse.urljoin(site.home_url, "/feed/")]
     posts: list[dict[str, Any]] = []
     for feed_url in feeds[:1]:
         result = fetcher.get(feed_url, accept="application/rss+xml, application/atom+xml, application/xml, text/xml",
                              respect_robots=True, max_bytes=2_000_000, timeout=12)
-        if not result.ok or not result.text.lstrip().startswith(("<?xml", "<rss", "<feed", "<rdf")):
+        if not result.ok or not result.text.lstrip().lstrip("﻿").startswith(("<?xml", "<rss", "<feed", "<rdf")):
             continue
         try:
-            root = ET.fromstring(result.text.encode("utf-8") if isinstance(result.text, str) else result.text)
+            root = ET.fromstring(result.body or result.text.encode("utf-8"))
         except ET.ParseError:
-            continue
+            try:
+                root = ET.fromstring(result.text.lstrip("﻿").encode("utf-8"))
+            except ET.ParseError:
+                continue
         items = []
         for node in root.iter():
             tag = node.tag.split("}")[-1]
             if tag not in {"item", "entry"}:
                 continue
-            fields = {child.tag.split("}")[-1]: child for child in node}
-            title = (fields.get("title").text or "").strip() if fields.get("title") is not None else ""
-            link_node = fields.get("link")
-            link = ""
-            if link_node is not None:
-                link = (link_node.text or "").strip() or link_node.attrib.get("href", "")
-            date_node = fields.get("pubDate") or fields.get("published") or fields.get("updated") or fields.get("date")
+            fields: dict[str, Any] = {}
+            for child in node:
+                fields.setdefault(child.tag.split("}")[-1], child)
+            title_node = fields.get("title")
+            title = re.sub(r"\s+", " ", html_lib.unescape(title_node.text or "")).strip() if title_node is not None else ""
+            link = _entry_link(node)
+            date_node = _first_child(fields, "pubDate", "published", "updated", "date")
             raw_date = (date_node.text or "").strip() if date_node is not None else ""
             iso = None
             try:
@@ -948,7 +994,7 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
             except (TypeError, ValueError, IndexError):
                 match = re.match(r"(\d{4}-\d{2}-\d{2})", raw_date)
                 iso = match.group(1) if match else None
-            if title and link and iso and host_of(link).endswith(registrable(site_host)):
+            if title and link and iso and iso <= _today() and host_of(link).endswith(registrable(site_host)):
                 items.append((iso, title, link, raw_date))
         items.sort(reverse=True)
         lines = []
@@ -963,6 +1009,50 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
                                       extra={"event_date": iso, "url": link})
             if claim:
                 posts.append({"date": iso, "title": title, "url": link, "claim_id": claim["id"]})
+    return posts
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 10) -> list[dict[str, Any]]:
+    """Dated posts from the verified site's own WordPress REST API (``/wp-json/wp/v2/posts``), for WordPress sites whose
+    pages do not advertise a feed. The endpoint is part of the company's site and robots.txt is honoured; each claim cites a
+    JSON pointer into the stored response."""
+    if not is_wordpress(site):
+        return []
+    parts = urllib.parse.urlsplit(site.pages[0][0].final_url or site.home_url)
+    base = f"{parts.scheme}://{parts.netloc}"
+    url = f"{base}/wp-json/wp/v2/posts?per_page={limit}&_fields=id,date,link,title"
+    result = fetcher.get(url, accept="application/json", respect_robots=True, max_bytes=1_000_000, timeout=12)
+    if not result.ok or not host_of(result.final_url or url).endswith(registrable(host_of(site.home_url))):
+        return []
+    try:
+        data = json.loads(result.text.lstrip("﻿"))
+    except ValueError:
+        return []
+    if not isinstance(data, list):
+        return []
+    doc = Document(url=url, source_class="company_owned_website_api", retrieved_at=result.retrieved_at, sha256=result.sha256,
+                   text=canonical_json(data), data=data, final_url=result.final_url)
+    site_root = registrable(host_of(site.home_url))
+    posts: list[dict[str, Any]] = []
+    for index, item in enumerate(data[:limit]):
+        if not isinstance(item, dict):
+            continue
+        rendered = (item.get("title") or {}).get("rendered") if isinstance(item.get("title"), dict) else item.get("title")
+        title = re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", str(rendered or "")))).strip()
+        link = str(item.get("link") or "")
+        raw_date = str(item.get("date") or "")
+        iso = raw_date[:10]
+        if not (title and link and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) and iso <= _today() and host_of(link).endswith(site_root)):
+            continue
+        claim = ledger.json_claim(doc, f"/{index}", "activity", "website_post", value={"title": title, "url": link, "published": raw_date},
+                                  qualifier=link, display=f"{iso} — {title}", effective_at=iso, confidence=0.95,
+                                  method="wordpress_rest_api", extra={"event_date": iso, "url": link})
+        if claim:
+            posts.append({"date": iso, "title": title, "url": link, "claim_id": claim["id"]})
     return posts
 
 
