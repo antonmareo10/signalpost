@@ -125,14 +125,20 @@ industry code, contact details, roles).
    with or without `www` is reported as gone (`not_available`), not as `blocked`.
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
    when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded, and a profile linked
-   from several companies' sites in one batch (web-agency footers) is dropped.
+   from several companies' sites in one batch (web-agency footers) is dropped. Since 1.3.0, when the verified page sits on
+   someone else's site (a chain's dealer page, a group's or a manager's site: the page is a sub-page, or the site prints
+   another organisation number, or its domain carries none of the company's current names, and the site does not print
+   this company's organisation number), only the page itself is published, labelled `site_scope: shared_site`; the
+   brand, description, profiles, careers page and posts on that site belong to the chain, the group or the manager.
 5. **Jobs** – NAV's public job-vacancy feed (public token, republishing permitted by NAV's API terms). An ad is attributed
    only when `employer.orgnr` is the company or one of its registered workplaces. Contact persons are never stored.
    Ads are looked up by the names of the company and its workplaces, without store numbers ("NARVESEN BUTIKKEN 600"
    advertises as "Narvesen Harstad Sykehus"); the organisation number alone decides the match.
 6. **Dated activity** – the verified site's RSS/Atom feed (up to 10 items, nothing dated in the future), its WordPress
    REST API (`/wp-json/wp/v2/posts`, robots.txt honoured) when a WordPress site advertises no feed, dated JSON-LD articles,
-   and dated news teasers (the date must be in the teaser or the only date on the adjacent line); plus dated register
+   and dated news teasers (the date must be in the teaser or the only date on the adjacent line). Posts dated before the
+   company was founded, lorem-ipsum excerpts, WordPress's install-time sample post and the theme demo posts dated up to two
+   months after it are skipped, and `utm_*` parameters are removed from post links; plus dated register
    events: role changes, and Enhetsregisteret's update log filtered to this organisation number (only entries that state
    which fields changed; the last 24 months).
 7. **Filed-accounts documents** – Regnskapsregisteret's list of annual-account copies for this organisation number; each

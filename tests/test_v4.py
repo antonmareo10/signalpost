@@ -285,3 +285,26 @@ class RenamedCompanyTests(unittest.TestCase):
         s = site("https://trv.no/", "<html><body>TRV Gruppen</body></html>")
         s.proof = {"orgnr": None, "other_orgnrs": []}
         self.assertTrue(shared_site(company, s))
+
+
+class SharedSiteProfileTests(unittest.TestCase):
+    def test_dealer_keeps_its_own_profile_but_not_the_chains(self):
+        html = ("<html><head><title>Systemhus Østenfjeldske</title></head><body>"
+                "<a href='https://www.facebook.com/systemhus'>Facebook</a>"
+                "<a href='https://www.facebook.com/ostenfjeldskebygg'>Østenfjeldske Bygg på Facebook</a>"
+                "<a href='https://www.instagram.com/systemhus'>Instagram</a>"
+                "Østenfjeldske Bygg &amp; Entreprenør AS, Hamar</body></html>")
+        company = Company(org="952590340", name="ØSTENFJELDSKE BYGG & ENTREPRENØR AS")
+        s = site("https://www.systemhus.no/forhandlere/ostenfjeldske/", html)
+        s.proof = {"orgnr": None, "other_orgnrs": []}
+        ledger = Ledger(company.org)
+        extract_site(ledger, company, s)
+        self.assertEqual([c["normalized_url"] for c in ledger.by_field("social_profile")], ["https://www.facebook.com/ostenfjeldskebygg"])
+
+    def test_manager_profile_sharing_one_word_is_not_kept(self):
+        from signalpost.web import own_handle_on_shared_site
+        company = Company(org="990468915", name="MARITIM RESEARCH I AS")
+        self.assertFalse(own_handle_on_shared_site(company, "https://www.linkedin.com/company/maritim-management", "www.mmanagement.no"))
+
+    def test_nynorsk_eigedom_is_generic(self):
+        self.assertTrue(domain_match(Company(org="1", name="TORPOMOEN EIGEDOM AS"), "torpomoen.no")[1])

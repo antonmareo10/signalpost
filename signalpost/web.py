@@ -35,7 +35,8 @@ GENERIC = {"norge", "norway", "norsk", "norske", "service", "services", "eiendom
            "data", "energi", "eiendommer", "investering", "management", "property", "properties", "capital", "trading",
            "import", "export", "agentur", "ventures", "venture", "industri", "industrier", "verksted", "salg", "produksjon",
            "bil", "elektro", "ror", "rør", "mat", "helse", "omsorg", "klinikk", "tannlege", "lege", "advokat", "advokatfirma",
-           "landbruk", "gard", "garden", "fiske", "shipping", "marine", "maritime", "offshore", "olje", "oil", "gas", "it"}
+           "landbruk", "gard", "garden", "fiske", "shipping", "marine", "maritime", "offshore", "olje", "oil", "gas", "it",
+           "eigedom", "eigedomar", "eigedommar", "eigedomsselskap", "eiendomsselskap"}
 FREEMAIL = {"gmail.com", "googlemail.com", "hotmail.com", "hotmail.no", "outlook.com", "outlook.no", "live.com", "live.no", "msn.com",
             "yahoo.com", "yahoo.no", "icloud.com", "me.com", "mac.com", "online.no", "start.no", "frisurf.no", "broadpark.no",
             "c2i.net", "getmail.no", "lyse.net", "altibox.no", "epost.no", "mail.com", "aol.com", "protonmail.com", "proton.me",
@@ -788,6 +789,17 @@ def handle_matches(company: Company, url: str, brand: str | None, site_host: str
     return bool(initials and len(initials) >= 3 and (initials == label or initials in candidates))
 
 
+def own_handle_on_shared_site(company: Company, url: str, site_host: str) -> bool:
+    """A profile linked from a chain's or group's page belongs to the company only when its handle carries at least two
+    of the company's own name words and one of them is not part of the site's own name."""
+    path = urllib.parse.unquote(urllib.parse.urlsplit(url).path + "?" + urllib.parse.urlsplit(url).query)
+    compact = domain_key(path)
+    label = domain_key(registrable(site_host).split(".")[0])
+    words = {domain_key(t) for name in [company.name, *company.brands] for t in name_tokens(name) if len(domain_key(t)) >= 3}
+    present = {w for w in words if w in compact}
+    return len(present) >= 2 and any(w not in label for w in present)
+
+
 def opaque_handle(url: str) -> bool:
     """Numeric/channel identifiers cannot carry a name, so name matching cannot be applied to them."""
     return bool(OPAQUE_HANDLE.search(url))
@@ -868,13 +880,15 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
                                  extra=extra)
     if official:
         out["claim_id"] = official["id"]
-    if not primary or shared:
-        # A chain's or group's site: its brand, description, profiles, careers page, e-mail and posts are the chain's.
-        out["shared"] = shared
+    out["shared"] = shared
+    if not primary:
         return out
     # public brand: og:site_name, Organization name in JSON-LD, or the title segment that matches the domain
+    # (not on a chain's or group's site: its brand and description are the chain's)
     brand, span = None, None
-    if home.meta.get("og:site_name"):
+    if shared:
+        pass
+    elif home.meta.get("og:site_name"):
         brand, span = home.meta["og:site_name"], f"[meta og:site_name] {home.meta['og:site_name']}"
     elif home.title:
         label = domain_key(registrable(site_host).split(".")[0])
@@ -888,7 +902,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
         claim = ledger.text_claim(home_doc, span, "identity", "public_brand", brand, confidence=0.9, method="site_metadata")
         if claim:
             out["brand"] = brand
-    description = home.meta.get("description") or home.meta.get("og:description")
+    description = None if shared else (home.meta.get("description") or home.meta.get("og:description"))
     if description and 20 <= len(description) <= 600:
         key = "description" if home.meta.get("description") == description else "og:description"
         claim = ledger.text_claim(home_doc, f"[meta {key}] {description}", "website", "website_description", description,
@@ -921,10 +935,15 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     for platform, items in by_platform.items():
         # A readable handle must name the company (or its brand/domain); opaque numeric/channel ids are accepted only
         # when they are the site's single link for that platform. Owners' personal pages and parent-group profiles fail this.
-        matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)
-                    and not foreign_entity_handle(company, i["url"])]
-        opaque = [i for i in items if opaque_handle(i["url"]) and i not in matching]
-        keep = matching[:2] if matching else (opaque[:1] if len(items) == 1 else [])
+        if shared:
+            # On a chain's dealer page only the dealer's own profile counts ("ostenfjeldskebygg" on systemhus.no), never
+            # the chain's ("systemhus"): the handle must carry two of the company's own name words, one of them not the chain's.
+            keep = [i for i in items if own_handle_on_shared_site(company, i["url"], site_host)][:2]
+        else:
+            matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)
+                        and not foreign_entity_handle(company, i["url"])]
+            opaque = [i for i in items if opaque_handle(i["url"]) and i not in matching]
+            keep = matching[:2] if matching else (opaque[:1] if len(items) == 1 else [])
         for item in keep:
             doc = item["doc"]
             span = (f"[link] {item['raw']} {item['text']}".strip() if not item.get("jsonld") else None)
@@ -941,6 +960,8 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
                                       extra={"platform": platform, "normalized_url": item["url"], "handle_matches_name": named})
             if claim:
                 out["profiles"].append({"platform": platform, "url": item["url"], "claim_id": claim["id"]})
+    if shared:
+        return out  # the careers page and e-mail addresses on a chain's or group's site are the chain's
     # careers pages and applicant-tracking portals linked from the site
     seen_career: set[str] = set()
     for doc, page in docs:

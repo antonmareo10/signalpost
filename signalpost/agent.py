@@ -223,7 +223,7 @@ class Agent:
     def _activity_tier(company: Company) -> str | None:
         """'operating' (employees or NOK 1M+ revenue), 'small' (NOK 100k+ revenue) or None (holding/property/dormant)."""
         name = company.name.lower()
-        if re.search(r"\b(holding|invest|investering|eiendom|eiendommer|property|kapital|capital)\b", name):
+        if re.search(r"\b(holding|invest|investering|eiendom|eiendommer|eigedom|eigedomar|property|kapital|capital)\b", name):
             return None
         if company.industry.startswith(("64.2", "64.3", "68.2", "70.1")):
             return None
@@ -403,7 +403,7 @@ class Agent:
         return any(c.source.startswith("registry") for c in candidates[index:])
 
     def _search_worthy(self, company: Company) -> bool:
-        if re.search(r"\b(holding|invest|investering|eiendom|eiendommer|property|properties)\b", company.name.lower()):
+        if re.search(r"\b(holding|invest|investering|eiendom|eiendommer|eigedom|eigedomar|property|properties)\b", company.name.lower()):
             return False
         if company.industry.startswith(("64.2", "64.3", "68.2", "70.1")) or company.legal_form in ("BRL", "ESEK", "BBL", "SAM"):
             return False
