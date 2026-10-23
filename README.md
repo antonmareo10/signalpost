@@ -118,14 +118,23 @@ industry code, contact details, roles).
    contact details is marked `related` (group/manager site), not published. For small active companies the name-search
    route is not enough: fewer of them have a site at all, so their sites need the organisation number, the exact legal
    name or the legal name plus a registered contact detail.
+   Since 1.3.0, a website the company itself lists in the register that answers but refuses automated access
+   (robots.txt or HTTP 401/403/429) is published from the register listing when its domain is named after the company
+   (for the domain of the registered e-mail address, only when it spells the whole legal name). Its pages are not read,
+   so no brand, profile, careers page or post comes from it, and the profile says so. A domain that does not resolve
+   with or without `www` is reported as gone (`not_available`), not as `blocked`.
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
    when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded, and a profile linked
    from several companies' sites in one batch (web-agency footers) is dropped.
 5. **Jobs** – NAV's public job-vacancy feed (public token, republishing permitted by NAV's API terms). An ad is attributed
    only when `employer.orgnr` is the company or one of its registered workplaces. Contact persons are never stored.
-6. **Dated activity** – RSS/Atom feeds and dated news teasers on the verified site (the date must be in the teaser or the
-   only date on the adjacent line), plus dated register events: role changes, and Enhetsregisteret's update log filtered
-   to this organisation number (only entries that state which fields changed; the last 24 months).
+   Ads are looked up by the names of the company and its workplaces, without store numbers ("NARVESEN BUTIKKEN 600"
+   advertises as "Narvesen Harstad Sykehus"); the organisation number alone decides the match.
+6. **Dated activity** – the verified site's RSS/Atom feed (up to 10 items, nothing dated in the future), its WordPress
+   REST API (`/wp-json/wp/v2/posts`, robots.txt honoured) when a WordPress site advertises no feed, dated JSON-LD articles,
+   and dated news teasers (the date must be in the teaser or the only date on the adjacent line); plus dated register
+   events: role changes, and Enhetsregisteret's update log filtered to this organisation number (only entries that state
+   which fields changed; the last 24 months).
 7. **Filed-accounts documents** – Regnskapsregisteret's list of annual-account copies for this organisation number; each
    year becomes a claim with the official PDF URL. The endpoint publishes a small request budget, so calls are paced
    (≈4/s) and a refusal is reported as `blocked`, never as "no documents".
@@ -164,7 +173,7 @@ removals. Every run's envelopes are preserved in `history/`.
 | data.brreg.no Regnskapsregisteret annual-account copies (`aarsregnskap/kopi/{org}/aar`) | list of filed years with the official PDF URL | NLOD 2.0 open data; paced to the published request budget |
 | data.ssb.no KLASS (classification 6, SN2025 with SN2007 fallback) | official English industry labels | Statistics Norway open data (attribution: Statistics Norway) |
 | pam-stilling-feed.nav.no (public token) | active job ads by employer organisation number | NAV API terms: anyone may use and republish ads |
-| The company's own website (only after the identity gate) | website, description, brand, social links, careers page, posts | robots.txt honoured; honest User-Agent; ≤2 concurrent requests per host |
+| The company's own website (only after the identity gate) | website, description, brand, social links, careers page, posts (RSS/Atom feed, or the site's own WordPress REST API) | robots.txt honoured; honest User-Agent; ≤2 concurrent requests per host |
 | Brave / Tavily (only if a key is supplied) | website candidates only, never evidence | provider terms; results kept in memory/cache only |
 
 Not used: LinkedIn, Facebook, Instagram, Glassdoor, Indeed or Google scraping; Brreg's `w2.brreg.no/kunngjoring`

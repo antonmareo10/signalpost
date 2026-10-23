@@ -314,6 +314,8 @@ class SiteResearcher:
 
     def research(self, company: Company, candidate: Candidate) -> SiteResult:
         result, home = self._fetch_page(candidate.url, retries=1 if candidate.strength in ("strong", "medium") else 0)
+        no_dns = (result.error or "").startswith("unsafe_url: hostname did not resolve")
+        other_failure = None
         if home is None and recoverable_failure(result):
             # Same registrable domain, other spelling: many small sites only answer on www (or only on the apex), have a
             # certificate for one of the two, or list a dead deep link in the register. A refusal (robots.txt, 401/403/429)
@@ -324,7 +326,12 @@ class SiteResearcher:
                         (alt_result.blocked and "robots" in (alt_result.error or "")):
                     result, home = alt_result, alt_home
                     break
-        if result.blocked and (result.error or "").startswith("unsafe_url: hostname did not resolve"):
+                if not (alt_result.error or "").startswith("unsafe_url: hostname did not resolve"):
+                    other_failure = alt_result
+        if no_dns and home is None and result.blocked and (result.error or "").startswith("unsafe_url: hostname did not resolve"):
+            if other_failure is not None:
+                # the other spelling exists in DNS but did not answer: we could not check, the domain is not gone
+                return SiteResult(candidate, "unreachable", other_failure.error or f"HTTP {other_failure.status}")
             # No DNS record for the name, with or without "www": the domain is gone. Nothing refused us, so this is not
             # "blocked"; the company simply has no site there.
             return SiteResult(candidate, "gone", "the domain does not resolve (no DNS record, with or without www)")
