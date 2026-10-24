@@ -17,6 +17,23 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
+# Plain-English names of the source classes, shared by the summary's source list and the viewer.
+SOURCE_LABELS = {
+    "official_registry_live": "Brønnøysund Register Centre: entity record (live API)",
+    "official_registry_snapshot": "Brønnøysund Register Centre: supplied registry snapshot",
+    "official_annual_accounts": "Register of Company Accounts: filed figures (API)",
+    "official_annual_account_copies": "Register of Company Accounts: list of filed accounts documents (API)",
+    "official_roles": "Brønnøysund Register Centre: roles (live API)",
+    "official_subunits": "Brønnøysund Register Centre: registered workplaces (live API)",
+    "official_group_structure": "Brønnøysund Register Centre: group structure (live API)",
+    "official_registry_updates": "Brønnøysund Register Centre: dated update log (live API)",
+    "official_classification": "Statistics Norway: industry classification (KLASS API)",
+    "official_job_vacancy_feed": "NAV public job-vacancy feed",
+    "company_owned_website": "The company's own website",
+    "company_owned_feed": "The company's own news feed",
+    "company_owned_website_api": "The company's own website (WordPress posts API)",
+}
+
 TRANSLIT = str.maketrans({"ø": "o", "Ø": "O", "å": "aa", "Å": "AA", "æ": "ae", "Æ": "AE", "ö": "o", "ä": "a", "ü": "u", "é": "e"})
 
 

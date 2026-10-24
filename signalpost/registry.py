@@ -446,6 +446,11 @@ UPDATE_LABELS = {
     "registrertIFrivillighetsregisteret": "voluntary-organisation register entry", "registrertIStiftelsesregisteret": "foundation register entry",
     "overordnetEnhet": "parent unit", "maalform": "official language form", "historiskeNavn": "former names",
     "registreringsdatoForetaksregisteret": "business-register date", "registreringsdatoMerverdiavgiftsregisteret": "VAT-register date",
+    "registreringsdatoMerverdiavgiftsregisteretEnhetsregisteret": "VAT-register date", "fravalgRevisjonDato": "decision to opt out of audit",
+    "fravalgRevisjonBeslutningsDato": "decision to opt out of audit", "underAvviklingDato": "liquidation date",
+    "registreringsdatoFrivilligMerverdiavgiftsregisteret": "voluntary VAT registration",
+    "frivilligMvaRegistrertBeskrivelser": "voluntary VAT registration", "paategninger": "register annotations",
+    "konkursdato": "bankruptcy date", "tvangsopplostPgaManglendeRegnskapDato": "compulsory dissolution for missing accounts",
 }
 SKIP_UPDATE_FIELDS = {"registreringsdatoAntallAnsatteEnhetsregisteret", "registreringsdatoAntallAnsatteNAVAaregisteret",
                       "harRegistrertAntallAnsatte", "hjelpeenhetskode", "_links", "links", "respons_klasse"}

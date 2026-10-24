@@ -331,16 +331,16 @@ class Agent:
             work.notes["website"] = f"{related.home_url}: {related.reason}"
         elif blocked:
             work.states["website"] = "blocked"
-            work.notes["website"] = "candidate website refused automated access (robots.txt or HTTP 401/403/429)"
+            work.notes["website"] = "a candidate website refused automated access with robots.txt or an HTTP 401, 403 or 429 response"
         elif unreachable_own:
             work.states["website"] = "failed"
-            work.notes["website"] = "the registered website could not be reached in this run (network error); previous values are kept"
+            work.notes["website"] = "the registered website could not be reached in this run because of a network error, so earlier values are kept"
         else:
             work.states["website"] = "not_available"
             if not candidates:
                 work.notes["website"] = "no website listed in the register and no verifiable candidate"
             elif gone_own:
-                work.notes["website"] = "the domain listed in the register (website or e-mail) no longer resolves; no other candidate could be tied to this exact legal entity"
+                work.notes["website"] = "the domain the register lists for its website or e-mail no longer resolves, and no other candidate could be tied to this exact legal entity"
             else:
                 work.notes["website"] = "candidates checked but none could be tied to this exact legal entity"
         # hiring
@@ -350,8 +350,8 @@ class Agent:
             work.states["hiring"] = "available"
         elif self.nav.state == "available":
             work.states["hiring"] = "not_available"
-            partial = " (feed only partially loaded within the time budget)" if self.nav.partial else ""
-            work.notes["hiring"] = "no active ad with this organisation number (or its workplaces) in NAV's job feed" + partial
+            partial = "; the feed was only partly loaded within the time budget" if self.nav.partial else ""
+            work.notes["hiring"] = "no active ad with this organisation number or one of its workplaces in NAV's job feed" + partial
         else:
             work.states["hiring"] = "failed"
             work.notes["hiring"] = f"NAV job feed unavailable: {self.nav.error}"
@@ -415,13 +415,16 @@ class Agent:
     def run(self, orgs: list[str], bulk: dict[str, dict[str, Any]] | None = None,
             previous: dict[str, dict[str, Any]] | None = None, previous_run_id: str | None = None) -> list[dict[str, Any]]:
         works = {org: Work(org, Ledger(org)) for org in orgs}
+        # NAV's feed is read page by page from the oldest change to the newest: give it time to reach the newest ads, but
+        # stop it before phase B has to go on without it.
+        self.nav.max_seconds = min(self.nav.max_seconds, max(30.0, self.remaining() - 180))
         nav_thread = threading.Thread(target=self._load_nav, daemon=True)
         nav_thread.start()
         copies_thread = threading.Thread(target=self._load_copies, args=(list(orgs),), daemon=True)
         copies_thread.start()
         self.log(f"[phase A] official registers for {len(orgs)} companies")
         self._parallel(orgs, lambda org: self.official(works[org], (bulk or {}).get(org)), "official")
-        nav_thread.join(timeout=max(5, min(260, self.remaining() - 120)))
+        nav_thread.join(timeout=max(5, min(self.nav.max_seconds + 30, self.remaining() - 120)))
         if self.nav.state == "available":
             names = {}
             for org, work in works.items():
@@ -544,7 +547,9 @@ class Agent:
         if work.states.get("accounts") != "available":
             missing.append("accounts")
         summary = build_summary(ledger, {"accounts": work.accounts, "changes": changes, "previous_run_id": (previous or {}).get("run", {}).get("run_id"),
-                                         "missing": missing, "today": self.today, "states": dict(work.states), "notes": dict(work.notes)})
+                                         "previous_completed_at": (previous or {}).get("run", {}).get("completed_at"),
+                                         "missing": missing, "today": self.today, "states": dict(work.states), "notes": dict(work.notes),
+                                         "discovery": work.discovery})
         sections = {}
         for section in SECTIONS:
             claim_ids = [c["id"] for c in ledger.claims if c["section"] == section]

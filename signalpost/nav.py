@@ -53,7 +53,9 @@ class NavJobs:
         self.details: dict[str, tuple[Any, Document]] = {}
         self.by_org: dict[str, list[str]] = {}
         self.lock = threading.Lock()
-        self.max_seconds = 200
+        # The feed pages forward from the oldest change (100 days back) to the newest, so stopping early loses the most
+        # recent ads. The agent lowers this when the run's time budget is short.
+        self.max_seconds = 480
         self.partial = False
 
     # -- feed --------------------------------------------------------------------------------
@@ -76,7 +78,7 @@ class NavJobs:
         started = time.monotonic()
         while url and pages < self.max_pages:
             if time.monotonic() - started > self.max_seconds:
-                self.error = f"feed loading stopped after {self.max_seconds}s ({pages} pages); older active ads may be missing"
+                self.error = f"feed loading stopped after {self.max_seconds:.0f}s ({pages} pages); the most recently changed ads may be missing"
                 self.partial = True
                 break
             result = self.fetcher.get(url, accept="application/json", headers=headers, retries=2, snapshot=False, timeout=60,

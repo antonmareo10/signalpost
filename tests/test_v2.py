@@ -208,7 +208,8 @@ class ViewerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             page = build_site([envelope], Path(tmp)).read_text(encoding="utf-8")
         data = json.loads(page.split('<script id="data" type="application/json">', 1)[1].split("</script>", 1)[0])
-        company = data["companies"][0]
+        self.assertEqual(data["companies"][0]["o"], ORG)  # the index row
+        company = data["details"][ORG]                       # the full profile, embedded because the batch is small
         self.assertTrue(all(s["p"] for s in company["sum"]))
         self.assertTrue(company["sig"])
         self.assertTrue(any(c["f"] == "annual_accounts_copy" and c["url"].endswith("/2025") for c in company["cl"]))

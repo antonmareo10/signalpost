@@ -22,7 +22,7 @@ That one command writes:
 |---|---|
 | `out/envelopes.jsonl` | one envelope per input organisation number, same order as the input |
 | `out/run-report.json` | counts, section states, coverage per field family, requests, p50/p95, cost, contract validation |
-| `out/site/index.html` | self-contained viewer (no server, no external requests): find, compare and verify on desktop and mobile — see below |
+| `out/site/index.html` (+ `out/site/data/`) | the viewer: find, compare and verify on desktop and mobile, no server, no external requests (see below; live smoke-test copy: https://antonmareo10.github.io/signalpost/smoke/site/) |
 | `out/snapshots/` | immutable gzip snapshots of every fetched source, named by SHA-256 |
 | `out/history/<run_id>.jsonl` | every run is kept; the next run diffs against the latest one |
 
@@ -36,18 +36,32 @@ Tests (offline): `python -m unittest discover -s tests`.
 
 ### The viewer (find, compare, verify)
 - **Find**: one search box over name, organisation number (with or without spaces), brand, place, person, industry and
-  former names, folded for æ/ø/å; Enter on an exact organisation number opens that profile; `/` focuses the search;
-  filters for verified website, hiring, social profiles, filed accounts, signals and changes; sort by evidence, name,
-  revenue or employees.
-- **Compare**: tick up to four companies (or add one by name/number inside the compare view); the table keeps the
-  first column fixed on phones and shades the rows where the companies differ.
-- **Verify**: every statement carries numbered buttons that open the exact excerpt, the source (named in plain
-  English), the URL, the retrieval time, the SHA-256 of the stored copy and the JSON pointer or locator, with
-  "Open source" and "Copy citation"; each profile can be downloaded as JSON. Missing values read "not found", never zero.
-- Each profile opens with the summary in five labelled parts (what it does, money, people and presence, what changed,
-  not found) and cited signals, then the accounts table with links to the official PDF of every filed year, identity,
-  leadership, website and profiles, hiring, a dated timeline of register events and own-channel posts, changes since
-  the previous run and what could not be found, with the reason.
+  former names, folded for æ/ø/å, ranked by best match; Enter on an exact organisation number opens that profile; `/` or
+  Ctrl/⌘+K focuses the search; filters for verified website, hiring, social profiles, dated posts, filed accounts, signals
+  and changes; sort by best match, data found, name, revenue or employees.
+- **Compare**: tick two to four companies, or press "Compare with…" on a profile; similar companies in the run (same
+  industry code, then same place) are offered as one-click additions. A comparison has its own link
+  (`#/compare/<org>,<org>`) that opens the same table on another device. Rows: the "In brief" overview, what was found,
+  industry, place, founding year, employees, latest revenue and its change, results, equity, leaders, workplaces,
+  website, profiles, job ads, latest post, signals, changes and gaps; shaded rows differ; every value has its source
+  button. The first column stays fixed on phones.
+- **Verify**: every statement carries a numbered source button. The numbers are the profile's list of sources (the same
+  numbers as the summary's `sources` in the envelope); hovering shows the source and its retrieval date, and a click opens
+  the exact excerpt, the source named in plain English, the URL, the retrieval time, the SHA-256 of the stored copy and
+  the JSON pointer or locator, with "Open source" and "Copy citation". Each profile can be downloaded as JSON.
+- **States**: every section shows found, not found, blocked, ambiguous, failed or not applicable with an icon and a word,
+  never colour alone, and a legend explains each one. Missing values read "not found", never zero.
+- Each profile opens with "In brief" (three to five cited sentences: what the company is, how its latest accounts look,
+  its online presence, what changed recently and what was not found), then the five labelled parts, the accounts table
+  with the official PDF of every filed year, identity, leadership, website and profiles, hiring, a dated timeline,
+  changes since our previous run, what could not be found with the reason, the numbered sources and every fact.
+- **Fast at batch scale**: the page carries a compact index of every company (about 0.6 MB for 1,000); each profile
+  (about 37 KB) is written to `site/data/<org>.js` and loaded when it is opened, so the 1,000-company viewer opens in
+  well under a second on a laptop. Small batches stay a single file. Profiles load through a `<script>` tag, so the
+  viewer works from disk (file://) as well as from any static host; keep `data/` next to `index.html`.
+- Accessibility: keyboard only (skip link, focus trap and Escape in the evidence panel, focus returns to the button),
+  labelled landmarks and controls, light and dark themes; axe-core 4.14 (WCAG 2.2 AA and best practice) reports no
+  violations on the list, a profile, the evidence panel and a comparison, at 1440 px and at 390 px.
 
 ### Optional search provider
 Website discovery works without any key (registry website, registry e-mail domain, NAV employer homepage, workplace
@@ -69,9 +83,18 @@ per query; capped by `--max-search` (default 400 per run).
     "identity": {"state": "available", "claims": 31, "note": null},
     "accounts": {…}, "people": {…}, "website": {…}, "hiring": {…}, "activity": {…}
   },
-  "summary": {"text": "…", "sentences": [{"text": "…", "claim_ids": ["c-…"], "part": "what_changed"}],
-              "parts": {"what_it_does": […], "money": […], "people_and_presence": […], "what_changed": […], "unknown": […]},
-              "signals": [{"text": "Revenue grew 107.4% in 2025.", "claim_ids": […], "tone": "up"}],
+  "summary": {"overview": "WYSSEN NORGE AS (trading as Wyssen Avalanche) is a Sogndal-based private limited company in …",
+              "text": "In brief: … What it does: … Money: … People and presence: … What changed: … Not found: …",
+              "sentences": [{"text": "…", "claim_ids": ["c-…"], "sources": [1, 3], "part": "what_changed"}],
+              "parts": {"overview": […], "what_it_does": […], "money": […], "people_and_presence": […], "what_changed": […], "unknown": […]},
+              "sources": [{"n": 1, "url": "https://data.brreg.no/enhetsregisteret/api/enheter/916340257",
+                           "source": "Brønnøysund Register Centre: entity record (live API)", "retrieved_at": "…Z"}],
+              "markdown": "### In brief
+… [1] [2]
+…
+### Sources
+[1] …",
+              "signals": [{"text": "Revenue grew 107.4% in 2025.", "claim_ids": […], "tone": "up", "sources": [3]}],
               "unknowns": ["active job ads", …], "unknown_detail": [{"item": "…", "state": "not_available", "reason": "…"}]},
   "claims": [{"id": "c-…", "section": "accounts", "field": "revenue", "key": "revenue|2025:SELSKAP", "value": 10021242.0,
               "display": "Revenue 2025: NOK 10,021,242", "reporting_period": "2025-01-01..2025-12-31",
@@ -149,19 +172,34 @@ industry code, contact details, roles).
 
 ## Synthesis and refresh
 
-The summary is generated from verified claims only (no language model). Each sentence lists the claim ids it rests on,
-and `check_sentence` rejects any sentence containing a number that is not a cited value or a declared computation
-(revenue change, operating margin, equity ratio, counts). It is organised in five parts that answer the brief directly:
+The summary is generated from verified claims only (no language model, nothing to reproduce with private keys). Each
+sentence lists the claim ids it rests on and the numbers of its sources, and `check_sentence` rejects any sentence
+containing a number that is not a cited value or a declared computation (revenue change, operating margin, equity
+ratio, counts). Ratios that would mislead (a margin beyond ±300 % on tiny revenue, an equity ratio when negative equity
+exceeds total assets) are left out. The summary opens with an overview and then has five parts that answer the brief:
 
+- **In brief** (`summary.overview`) – three to five sentences: what the company is (form, place, English industry label,
+  founding year, registered employees), how the latest filed accounts look (revenue and its change, and whether it has
+  moved the same way for two or more years running; operating profit or loss; equity), its verified online presence and
+  hiring, the most notable recent change, and what was not found.
 - **What it does** – legal form, place, founding year, the official English industry label next to the Norwegian one,
   the company's own description (or statutory purpose), registered employees and group parent.
 - **Money** – latest filed figures with the year-on-year change, margin and equity ratio, revenue by filed year,
   negative equity and unaudited accounts, and how many official PDF copies exist.
 - **People and presence** – leadership, workplaces, verified website and profiles, hiring, latest own-channel post.
-- **What changed** – the register's employee-count history, when the latest accounts were filed, other register changes
-  in the last 12 months (addresses, industry code, contact details…), the last role change, former names, and the diff
-  against our previous run (or a plain statement that this is the first run).
-- **Not found** – each missing family with its state and the reason (`unknown_detail`).
+- **What changed** – first, the diff against our previous run with its date ("Since our previous run on 2026-10-23,
+  nothing material has changed", or the changes) or a plain statement that this is our first run; then the accounts year
+  on year (revenue, the operating result turning from profit to loss or back, equity turning negative), the register's
+  employee-count history, when the latest accounts were filed, other register changes in the last 12 months, the last
+  role change and which entry it was, and former names.
+- **Not found** – one sentence per missing family with its state (not found, blocked, ambiguous, could not be checked)
+  and the reason, including how many candidate websites were checked and of which kind. A candidate that belongs to
+  another company is never named.
+
+`summary.sources` numbers every distinct source behind the summary (source name, URL, retrieval time), each sentence
+carries `sources: [n, …]`, and `summary.markdown` renders the whole summary with `[n]` markers and the numbered list,
+so the conclusions can be checked without the viewer. `summary.text` is the same summary as plain text with the part
+labels ("In brief: … What changed: … Not found: …").
 
 `signals` lists up to six short, cited flags a reader acts on (revenue up/down ≥25 %, employee count change, negative
 equity, register flags, recent address/name/industry change, recent leadership change, young company, hiring now).
@@ -189,4 +227,5 @@ Not used: LinkedIn, Facebook, Instagram, Glassdoor, Indeed or Google scraping; B
 ## Measured locally
 
 See [EVAL.md](EVAL.md). The committed 100-company smoke test lives in [`docs/smoke/`](docs/smoke/)
-(`run-report.json`, `envelopes.jsonl`, viewer `site/index.html`).
+(`run-report.json`, `envelopes.jsonl`, viewer `site/index.html` with its profiles in `site/data/`), and the viewer is
+published at https://antonmareo10.github.io/signalpost/smoke/site/.
