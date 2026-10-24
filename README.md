@@ -56,8 +56,8 @@ Tests (offline): `python -m unittest discover -s tests`.
   with the official PDF of every filed year, identity, leadership, website and profiles, hiring, a dated timeline,
   changes since our previous run, what could not be found with the reason, the numbered sources and every fact.
 - **Fast at batch scale**: the page carries a compact index of every company (about 0.6 MB for 1,000); each profile
-  (about 37 KB) is written to `site/data/<org>.js` and loaded when it is opened, so the 1,000-company viewer opens in
-  well under a second on a laptop. Small batches stay a single file. Profiles load through a `<script>` tag, so the
+  (about 37 KB) is written to `site/data/<org>.js` and loaded when it is opened, so the 1,000-company viewer shows its
+  list in 0.2 s on a laptop and 1.2 s on a phone emulated with a 4× slower CPU (1.3.0's single 50 MB page: 1.9 s and 21 s). Small batches stay a single file. Profiles load through a `<script>` tag, so the
   viewer works from disk (file://) as well as from any static host; keep `data/` next to `index.html`.
 - Accessibility: keyboard only (skip link, focus trap and Escape in the evidence panel, focus returns to the button),
   labelled landmarks and controls, light and dark themes; axe-core 4.14 (WCAG 2.2 AA and best practice) reports no

@@ -26,16 +26,19 @@ net result fallback, website host, profile platforms, job count, the gaps agains
 sentence) found no problem in 1,000 / 1,000. About 25 summaries were also read in full; that reading is what found the
 ratio, "Uoppgitt", flat-revenue and accountant-change wording fixed above.
 
-**Viewer.** 1.3.0 embedded every profile in one page: 49.8 MB for the 1,000-company batch, 2.3 s until the list showed
-on a laptop and 12.9 s on a phone emulated with a 4× slower CPU (headless Chromium, from disk). 1.4.0 keeps a compact
-index in the page and writes each profile to `site/data/<org>.js`, loaded when it is opened (it still works from disk):
+**Viewer.** 1.3.0 embedded every profile in one page: 49.8 MB for the 1,000-company batch. 1.4.0 keeps a compact
+index in the page and writes each profile to `site/data/<org>.js`, loaded when it is opened (it still works from disk).
+Time until the list shows, headless Chromium from disk, both viewers measured back to back with nothing else running:
 
 | 1,000 companies | 1.3.0 | 1.4.0 |
 |---|---|---|
 | `index.html` | 49.8 MB | 1.09 MB (index plus a plain-HTML list of every overview for readers without JavaScript) |
-| List ready, laptop | 2.3 s | 0.2 s |
-| List ready, phone emulation (390 px, 4× slower CPU) | 12.9 s | 2.5–2.9 s |
+| List ready, laptop (1440 px) | 1.9 s | 0.2 s |
+| List ready, phone emulation (390 px, 4× slower CPU) | 21.1 s | 1.2 s |
+| JavaScript heap | 81 MB | 10 MB |
 | A profile | in the page | about 37 KB, loaded on demand |
+
+(With a crawl running on the same machine the phone figures were 12.9 s and 2.5–2.9 s.)
 
 Also new: best-match search, counts on the filters, "Compare with…" and similar-company suggestions, comparison links
 (`#/compare/<org>,<org>`) that open on another device, numbered source buttons that match the profile's source list and
