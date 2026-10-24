@@ -1,7 +1,80 @@
-# Evaluation (local, 21–23 Oct 2026)
+# Evaluation (local, 21–24 Oct 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.4.0 (24 Oct): an overview with numbered sources, and a viewer that opens a 1,000-company batch at once
+
+This version changes how the profile is explained and shown, not what is collected (apart from the NAV feed limit
+below).
+
+**Synthesis.** Every summary now opens with "In brief" (`summary.overview`): what the company is, how its latest
+filed accounts look (revenue, its change and whether it moved the same way two years running, operating profit or
+loss, equity), its verified website, profiles and hiring, the most notable recent change and what was not found. Every
+sentence carries `sources: [n]`, `summary.sources` numbers each distinct source with URL and retrieval time, and
+`summary.markdown` renders the summary with `[n]` markers. "What changed" opens with the comparison against our previous
+run and its date (or says it is the first run), then the accounts year on year. "Not found" has one sentence per gap
+with its state and reason and the number and kind of candidate websites checked; a candidate that belongs to another
+company is never named. Ratios that would mislead are left out (a margin beyond ±300 %, an equity ratio when negative
+equity exceeds total assets: 1.3.0 printed "-28762200.0%" for one company), "Uoppgitt" (00.000) is not presented as an
+industry, unchanged revenue reads "unchanged", and amounts that round alike get one more decimal.
+
+Checked on 1,000 summaries from the 1,000-company run below and on the smoke test: every sentence that cites claims names its sources (14,858 / 14,858 on the
+1,000; 1,461 / 1,461 on the smoke test), none was dropped as unsupported, and an independent re-check of each overview
+against the envelope's own claims (revenue and its change, direction and streak, operating profit or loss, equity sign,
+net result fallback, website host, profile platforms, job count, the gaps against the section states, no URL in a gap
+sentence) found no problem in 1,000 / 1,000. About 25 summaries were also read in full; that reading is what found the
+ratio, "Uoppgitt", flat-revenue and accountant-change wording fixed above.
+
+**Viewer.** 1.3.0 embedded every profile in one page: 49.8 MB for the 1,000-company batch, 2.3 s until the list showed
+on a laptop and 12.9 s on a phone emulated with a 4× slower CPU (headless Chromium, from disk). 1.4.0 keeps a compact
+index in the page and writes each profile to `site/data/<org>.js`, loaded when it is opened (it still works from disk):
+
+| 1,000 companies | 1.3.0 | 1.4.0 |
+|---|---|---|
+| `index.html` | 49.8 MB | 1.09 MB (index plus a plain-HTML list of every overview for readers without JavaScript) |
+| List ready, laptop | 2.3 s | 0.2 s |
+| List ready, phone emulation (390 px, 4× slower CPU) | 12.9 s | 2.5–2.9 s |
+| A profile | in the page | about 37 KB, loaded on demand |
+
+Also new: best-match search, counts on the filters, "Compare with…" and similar-company suggestions, comparison links
+(`#/compare/<org>,<org>`) that open on another device, numbered source buttons that match the profile's source list and
+show source and retrieval date on hover, a legend for every state, and a "Show more" list instead of a cut-off. A
+scripted browser check (24 steps, desktop 1440 px and phone 390 px: find by number with spaces and by name, Ctrl+K,
+open a source, Escape returns focus, the numbered sources, the legend, tick two companies and compare, open a value's
+source in the comparison, a shared comparison link on a fresh visit, an unknown number) passes on the 1,000-company
+viewer, the committed smoke viewer and a 7-company single-file viewer. axe-core 4.14 (WCAG 2.2 AA and best practice)
+reports 0 violations on the list, a profile, the evidence panel, a comparison and the dark theme, at both widths.
+Fixed on the way: a search typed or pasted and submitted within 120 ms was sent back to the list by the debounce.
+
+**NAV.** The job feed pages from the oldest change (100 days back) to the newest, so the 200 s limit cut the newest
+ads when NAV was slow (the 1.3.0 smoke artifact stopped at 160 of 183 pages). The limit is now up to 480 s and follows
+the run's time budget; on every run below the whole feed loaded (183 pages).
+
+Same 1,000 random companies (seed 1000), 1.3.0 and 1.4.0 run back to back on 24 Oct, keyless, 24 workers:
+
+| Family | 1.3.0: companies / facts | 1.4.0: companies / facts |
+|---|---|---|
+| Verified website | 120 / 122 | 119 / 121 |
+| Company-owned social profiles | 73 / 141 | 73 / 141 |
+| Careers page or job ads | 21 / 25 | 21 / 25 |
+| Dated own-channel posts | 29 / 211 | 29 / 211 |
+| Accounts, roles, workplaces, register events | 823, 999, 765, 997 companies | the same |
+| Official PDF copies of filed accounts | 953 / 8,409 | 1,000 / 8,846 |
+| Wall clock / requests | 903 s / 8,388 | 865 s / 8,434 |
+
+Both runs passed contract validation and loaded the whole NAV feed (183 pages). No fact was gained; the two
+differences are the network on the day, not the code: aabergeplanteskule.no timed out in the 1.4.0 run (verified by its
+organisation number in 1.3.0), and in the 1.3.0 run the paced annual-accounts copies endpoint refused 47 companies,
+which those envelopes report as an error rather than as "no documents". 1,000 / 1,000 summaries have an overview (3.6 sentences on average,
+6.9 numbered sources per summary, 0 sentences dropped); 377 overviews name a recent change and 878 "What changed" parts
+compare the accounts year on year.
+
+Smoke test (`samples/smoke-100.jsonl`, three passes, 24 Oct, committed in `docs/smoke/`): 100/100 envelopes,
+validation passed on every pass, 111–114 s per pass, third pass 0 changes and 0 carried-forward claims, evidence audit
+9,390 / 9,390 excerpts re-found, 100/100 summaries with an overview (3.5 sentences on average), 1,461 / 1,461 sentences
+that cite claims carry their sources, 0 sentences dropped as unsupported, 6.9 numbered sources per summary. Verified
+websites 9 as in 1.3.0. 93 offline unit tests.
 
 ## Version 1.3.0 (23 Oct): dated posts are published, and chain or group sites stop lending their content
 
