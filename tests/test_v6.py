@@ -228,6 +228,31 @@ class TooManyRequestsTests(unittest.TestCase):
         self.assertEqual(result.status, 429)
         self.assertEqual(len(calls), 3)
 
+    def test_a_long_retry_after_is_not_retried_early(self):
+        from signalpost import net
+        fetcher = net.Fetcher()
+        calls = []
+
+        def raw_get(u, **_kw):
+            calls.append(u)
+            return net.FetchResult(url=u, final_url=u, status=429, error="HTTP 429", retry_after=60.0, retrieved_at="2026-10-31T00:00:00Z")
+        with mock.patch.object(fetcher, "_raw_get", side_effect=raw_get), mock.patch.object(net.time, "sleep"):
+            result = fetcher.get("https://measureit.no/", retries=0, snapshot=False)
+        self.assertEqual((result.status, len(calls)), (429, 1))
+
+    def test_a_rate_limited_candidate_leaves_the_website_blocked_not_empty(self):
+        from signalpost.web import SiteResult
+        agent = Agent(run_id="t", snapshot_dir=None, cache_dir=None, workers=1, use_search=False, log=lambda *a: None)
+        work = Work("928786005", Ledger("928786005"))
+        work.company = Company(org="928786005", name="S KORSGAARD AS", legal_form="AS", revenue=2_000_000)
+        work.entity = {}
+        candidate = Candidate("https://kenslastudio.com", "domain_guess_from_legal_name", "weak")
+        with mock.patch.object(agent, "candidates", return_value=[candidate]),                 mock.patch.object(agent.sites, "research",
+                                  return_value=SiteResult(candidate, "blocked", "site refused automated access (HTTP 429)")),                 mock.patch.object(agent.nav, "claims", return_value=[]):
+            agent.footprint(work)
+        self.assertEqual(work.states["website"], "blocked")
+        self.assertIn("HTTP 429", work.notes["website"])
+
     def test_the_registers_paced_endpoints_are_left_to_their_pacer(self):
         result, calls, _ = self.fetch("https://data.brreg.no/regnskapsregisteret/regnskap/aarsregnskap/kopi/1/aar", [429, 200])
         self.assertEqual(result.status, 429)

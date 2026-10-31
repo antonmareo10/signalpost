@@ -110,6 +110,7 @@ class FetchResult:
     error: str | None = None
     redirect_chain: list[str] = field(default_factory=list)
     blocked: bool = False  # robots.txt or policy refusal
+    retry_after: float | None = None  # seconds, from a 429/503 answer's Retry-After header
 
     @property
     def ok(self) -> bool:
@@ -201,9 +202,11 @@ class Fetcher:
                 attempt += 1
                 time.sleep(1.5 * attempt)
                 continue
-            if result.status == 429 and attempt < 2 and (urllib.parse.urlsplit(url).hostname or "").lower() not in self.api_hosts:
-                # "Too many requests" is a request to slow down, not a refusal: many small shops share one platform edge
-                # (Shopify's), which rate-limits all of them together while the batch runs. Wait and ask again, twice at most.
+            if result.status == 429 and attempt < 2 and (result.retry_after is None or result.retry_after <= 10) \
+                    and (urllib.parse.urlsplit(url).hostname or "").lower() not in self.api_hosts:
+                # "Too many requests" asks us to slow down: when the site says a short wait will do (or says nothing), wait
+                # and ask again, twice at most. Shopify's storefronts answer "Retry-After: 60" to a crawler for minutes on
+                # end, so those are left as refused for this run rather than retried early.
                 attempt += 1
                 time.sleep(3.0 * attempt)
                 continue
@@ -228,6 +231,7 @@ class Fetcher:
         final_url = url
         content_type = ""
         error = None
+        retry_after: float | None = None
         chain: list[str] = []
         sem = self._semaphore(host)
         with sem:
@@ -249,6 +253,10 @@ class Fetcher:
                 except Exception:
                     body = b""
                 error = f"HTTP {exc.code}"
+                try:
+                    retry_after = float((exc.headers.get("Retry-After") or "").strip()) if exc.headers else None
+                except ValueError:
+                    retry_after = None
             except UnsafeURL as exc:
                 error = f"unsafe_redirect: {exc}"
             except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError, ssl.SSLError,
@@ -260,7 +268,7 @@ class Fetcher:
         text = _to_text(body, content_type)
         return FetchResult(url=url, final_url=final_url, status=status, content_type=content_type, body=body, text=text,
                            sha256=hashlib.sha256(body).hexdigest() if body else "", retrieved_at=retrieved_at,
-                           elapsed_ms=elapsed, error=error, redirect_chain=chain)
+                           elapsed_ms=elapsed, error=error, redirect_chain=chain, retry_after=retry_after)
 
     def _persist(self, result: FetchResult) -> None:
         assert self.snapshot_dir is not None

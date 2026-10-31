@@ -248,6 +248,7 @@ class Agent:
         related = None
         unreachable_own = False
         blocked = False
+        rate_limited = False
         gone_own = False
         refused_own: list[tuple[Candidate, Any]] = []
         candidates = self.candidates(work)
@@ -296,6 +297,10 @@ class Agent:
                 blocked = True  # a refused *guess* says nothing about the company's own site
                 if candidate.source in ("registry_website", "registry_email_domain"):
                     refused_own.append((candidate, result))
+            if result.state == "blocked" and "HTTP 429" in result.reason:
+                # "Too many requests" is not an answer about the company: a site verified last run that asks us to slow
+                # down now is kept from the previous run (the section is blocked, not empty), not reported as removed.
+                rate_limited = True
             if result.state == "gone" and candidate.strength in ("strong", "medium"):
                 gone_own = True
         if verified is None and refused_own:
@@ -338,6 +343,10 @@ class Agent:
         elif blocked:
             work.states["website"] = "blocked"
             work.notes["website"] = "a candidate website refused automated access with robots.txt or an HTTP 401, 403 or 429 response"
+        elif rate_limited:
+            work.states["website"] = "blocked"
+            work.notes["website"] = ("a candidate website asked us to slow down (HTTP 429), so it could not be read in this run; "
+                                     "values from a previous run are kept")
         elif unreachable_own:
             work.states["website"] = "failed"
             work.notes["website"] = "the registered website could not be reached in this run because of a network error, so earlier values are kept"
