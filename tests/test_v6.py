@@ -92,6 +92,23 @@ class RegisteredOwnerTests(unittest.TestCase):
         self.assertEqual(found.state, "verified")
         self.assertTrue(any("hjemmeside=saltek.no" in call for call in fetcher.calls))
 
+    def test_a_nuf_owns_the_site_of_the_foreign_company_it_registers(self):
+        nuf = Company(org="927475545", name="MANSOFT", legal_form="NUF", emails={"regnskab@mansoft.dk"})
+        home = ("<html><head><title>Mansoft – IT-drift og Microsoft 365 for små og mellemstore virksomheder</title></head><body>"
+                "<h1>Mansoft</h1><p>Vi hjælper virksomheder med IT-drift, sikkerhed og Microsoft 365 i Danmark og Norge.</p>"
+                "<footer>Kontakt Mansoft A/S, Lyngbyvej 2, 2100 København, regnskab@mansoft.dk</footer></body></html>")
+        answers = {"https://mansoft.dk": lambda url: result(url, home.encode("utf-8"), "text/html; charset=UTF-8"),
+                   BRREG.format(kind="enheter", domain="mansoft.dk"): brreg_answer("enheter", [
+                       {"organisasjonsnummer": "927579235", "navn": "MANSOFT A/S", "organisasjonsform": {"kode": "UTLA"},
+                        "hjemmeside": "www.mansoft.dk"}]),
+                   BRREG.format(kind="underenheter", domain="mansoft.dk"): brreg_answer("underenheter", [])}
+        candidate = Candidate("https://mansoft.dk", "registry_email_domain", "medium")
+        found = SiteResearcher(FakeFetcher(answers)).research(nuf, candidate)
+        self.assertEqual(found.state, "verified")
+        # the same site is still someone else's for a Norwegian AS that happens to share the e-mail domain
+        other = Company(org="999999999", name="MANSOFT NORGE AS", legal_form="AS", emails={"regnskab@mansoft.dk"})
+        self.assertEqual(SiteResearcher(FakeFetcher(answers)).research(other, candidate).state, "related")
+
     def test_no_answer_from_the_register_is_not_a_verification(self):
         found, _ = self.research(SALTEK_HOME, None)
         self.assertEqual(found.state, "unreachable")

@@ -403,10 +403,15 @@ class SiteResearcher:
                     for item in ((result.json() or {}).get("_embedded") or {}).get(kind, []):
                         listed = normalize_site_url(item.get("hjemmeside"))
                         if listed and registrable(host_of(listed)) == domain:
-                            cached.append({"org": str(item.get("organisasjonsnummer") or ""), "parent": str(item.get("overordnetEnhet") or "")})
+                            cached.append({"org": str(item.get("organisasjonsnummer") or ""), "parent": str(item.get("overordnetEnhet") or ""),
+                                           "form": str((item.get("organisasjonsform") or {}).get("kode") or ""),
+                                           "name": str(item.get("navn") or "")})
                 with self._unique_lock:
                     self._owner_cache[domain] = cached
-            owners += [o for o in cached if company.org not in (o["org"], o["parent"])]
+            # A NUF is the Norwegian registration of a foreign company, which the register also lists as UTLA: one legal
+            # person, so the foreign company's site (mansoft.dk for MANSOFT, registered to MANSOFT A/S) is its own.
+            owners += [o for o in cached if company.org not in (o["org"], o["parent"])
+                       and not (company.legal_form == "NUF" and o["form"] == "UTLA" and set(name_tokens(o["name"])) == set(company.core))]
         unique = {o["parent"] or o["org"]: o for o in owners}
         return [{"org": org} for org in unique]
 
