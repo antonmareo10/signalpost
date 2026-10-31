@@ -152,9 +152,10 @@ industry code, contact details, roles).
    name-derived domain or a search) and that does not print this company's organisation number is checked against
    Enhetsregisteret's own website field (`enheter?hjemmeside=<domain>` and `underenheter?hjemmeside=<domain>`): if the
    register lists that website for another organisation (not this company or one of its workplaces), the site is
-   marked `related` and nothing from it is published. In the first 1,000-company batch this caught a holding company
-   that had been given its renamed sister company's website, a company sharing a municipal enterprise's e-mail domain,
-   a housing co-op given its developer's project site and a group company given the group's site. If the register does
+   marked `related` and nothing from it is published (a NUF keeps the site of the foreign company it registers: one
+   legal person). On a fresh 1,000-company batch this caught a holding company that had been given its renamed sister
+   company's website, a company sharing a municipal enterprise's e-mail domain, an owners' association given a
+   construction company's project site and a group company given the group's site (see EVAL.md). If the register does
    not answer, the site is reported as not checked rather than published.
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
    when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded (since 1.5.0 also a
@@ -218,7 +219,12 @@ equity, register flags, recent address/name/industry change, recent leadership c
 
 Refresh is a diff on stable claim keys (`field|qualifier`), so re-running the same snapshot yields no changes. Sections
 that fail or are blocked keep the previous supported value (`carried_forward_from`) instead of producing false
-removals. Every run's envelopes are preserved in `history/`.
+removals. Since 1.5.0 two more sources of false changes are closed: Brønnøysund's update log returns the same
+timestamp in UTC or in Oslo time depending on the server, so event dates are taken as the UTC date of the timestamp
+(not its first ten characters); and a candidate website that answers HTTP 429 ("too many requests") makes the website
+section `blocked` for that run, so a site verified before is carried forward rather than reported as removed (a 429
+with `Retry-After` of 10 s or less is retried twice; Shopify storefronts answer `Retry-After: 60` to crawlers and are
+not retried early). Every run's envelopes are preserved in `history/`.
 
 ## Sources, rights and safety
 

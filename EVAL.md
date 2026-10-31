@@ -1,7 +1,111 @@
-# Evaluation (local, 21–24 Oct 2026)
+# Evaluation (local, 21–31 Oct 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.5.0 (31 Oct): ask the register whose website it is, before publishing a site we inferred
+
+**How it was found.** 1.4.0 was run on 1,000 companies never used in development (the public universe, seed
+20261031) and every website it published was read by hand, together with what the register says about each domain.
+Five of the 127 sites belonged to another organisation although they had passed the identity gate:
+
+| Company | Site 1.4.0 published | Whose it is, per the register | What 1.4.0 attached |
+|---|---|---|---|
+| SALTEK HOLDING AS (formerly SALTEK AS) | saltek.no (from the shared e-mail domain) | SALTEK AS, 913207521, which now carries the old name | site, brand, 10 posts |
+| STEINKJER TOMTESELSKAP AS | steinkjerbygg.no (shared e-mail domain; its name appears on the site) | STEINKJERBYGG KF, a municipal enterprise | site, brand, LinkedIn, Facebook, careers page |
+| SAMEIET TINDEN APARTMENTS | tindenapartments.com (name-derived domain) | BYGG DET AS, the construction company | site, brand, description |
+| TRIDENT OPERATIONS AS | tridentaquaservices.com (a workplace's e-mail domain) | FSV GROUP AS, FSV SERVICES AS and INTERSHIP AS | site, brand, careers page |
+| VIKØYRI AS (property rental) | blixhotell.no (shared e-mail domain; already labelled `shared_site`) | BLIX HOTELL AS | the page only |
+
+Each puts another organisation's site under this company; the first two also carried that organisation's brand,
+profiles and posts, which is what the brief calls a material wrong-company publication.
+
+**The fix.** Enhetsregisteret's search accepts the website field (`/enheter?hjemmeside=<domain>`, and the same for
+`/underenheter`). When a site was inferred rather than registered (e-mail domain, NAV ad, name-derived domain, search)
+and does not print this company's organisation number, 1.5.0 asks the register which organisations list that domain
+(the redirect target and the candidate) as their website. If another organisation does (not this company, not one of
+its own workplaces), the site is marked `related` and nothing from it is published; the summary's gap says "a candidate
+site is listed in the register as another organisation's website" without naming it. If the register does not
+answer, the site is reported as not checked (and a refresh keeps the previous value) rather than published. Sites the
+company registered itself and sites that print its number are not affected. Cost: two register requests per domain
+checked, about 100 per 1,000 companies (45 and 41 checks in the two batches below).
+
+Also from the same reading: a profile handle that spells a registered role holder's first and last name is that
+person's page (instagram.com/denniskiil on KIIL MGMT AS's site), unless the company is named after the person; posts
+titled "Test" or "TEst 2 – hubspot" are not activity; `<title>` elements of inline SVG icons no longer leak into the page
+title (the brand "TravelmateFacebook iconInstagram icon" is now "Travelmate"); an AS also gets the `<name>as.no` and
+`<name>.as` guesses; and a parent with no revenue of its own that heads an operating group counts as operating (MEASURE IT AS:
+NOK 158 m group revenue, no guesses in 1.4.0).
+
+**Summary wording**, from linting the 2,000 summaries of the two batches below: "up 0.0%" (23 summaries) now reads
+"almost unchanged" (and "unchanged" only when the two filed values are identical), "turned from a profit of NOK 0"
+(8) and "went from NOK 0" (4) now say break-even, "revenue of NOK 0" (250) reads "no revenue (NOK 0)", "N.V.." has
+one full stop, and an ambiguous website says why: of the 50 ambiguous websites in the two 1.5.0 runs, 10 are the
+register check, 26 print another organisation number and 14 are group or manager sites sharing contact details, which
+1.4.0 also described as "prints another organisation number". Re-running the summaries of both batches with 1.5.0:
+none of those patterns left (three remaining hits are a space before a full stop inside verbatim register quotes),
+0 sentences dropped, and the independent re-check of every overview against the envelope's claims finds no problem in
+1,000 / 1,000.
+
+**Refresh.** Two sources of false changes turned up on 31 Oct and are closed. The third smoke pass of an early 1.5.0
+build showed 27 low-materiality "new" register events: Brønnøysund's update log answers "2025-09-01T22:05:37.005Z" on one
+call and "2025-09-02T00:05:37.005+02:00" on the next for the same update (fetched four times in a row: one +02:00, three
+Z), and the event date was the first ten characters. It is now the UTC date of the timestamp, which is also the date the
+register's own fields give for the change; the evidence check accepts a date when the cited excerpt has a timestamp on
+that UTC date. Second, Shopify storefronts answer this crawler "429, Retry-After: 60" for minutes (16 shops, one request
+every 5 s after a 65 s pause: 5 of 30 answered), so a site could be verified in one run and gone in the next
+(SUPERMERCADO AS: refused in passes 1 and 2, verified in pass 3). A 429 now makes the website section `blocked` for that
+run, so the previous run's site is carried forward instead of reported as removed; a 429 with a `Retry-After` of 10 s
+or less (or none) is retried twice, a longer one is not retried early.
+
+**Fresh batch (seed 20261031), 1.4.0 and the 1.5.0 release candidate on 31 Oct, keyless, 24 workers.** Both runs:
+1,000 / 1,000 envelopes, validation passed, the whole NAV feed (189 pages); 912 s and 1,005 s, 8,793 and 8,880 requests
+(a `hjemmeside` search answers in about 0.5 s).
+
+| Family | 1.4.0: companies / facts | 1.5.0: companies / facts | Why |
+|---|---|---|---|
+| Verified website | 127 / 127 | 122 / 122 | −5 register check (table above); Shopify 429 in one run or the other: −1 dekamund.com (refused in the 1.5.0 run), +1 smart4u.no (refused in the 1.4.0 run) |
+| Company-owned social profiles | 67 / 133 | 66 / 132 | −2 Steinkjerbygg's, −1 personal Instagram, +2 smart4u |
+| Careers page or job ads | 31 / 33 | 29 / 31 | −2 careers pages of Steinkjerbygg and the FSV group |
+| Dated own-channel posts | 28 / 190 | 27 / 179 | −10 Saltek AS's, −1 "TEst 2 – hubspot" |
+| Brand / description | 75 / 91 | 69 / 88 | the sites above |
+
+Website states in the 1.5.0 run: 122 available, 824 not available, 24 ambiguous (5 of them the register check), 17
+failed (registered site unreachable), 13 blocked (7 of them only because a candidate answered 429; 1.4.0 reported those
+as not available). An intermediate 1.5.0 build run between the two took 1,258 s with every request slower (p50 1.25 s →
+1.55 s): the network at that hour, not the code.
+
+**Seed-1000 batch (the development batch of 1.2.0–1.4.0), 1.5.0 on 31 Oct against 1.4.0 on 24 Oct.** 1,000 / 1,000,
+validation passed, 1,100 s, 8,645 requests, whole NAV feed (this run predates the NUF exception, the register-date fix
+and the 429 change).
+
+| Family | 1.4.0 (24 Oct) | 1.5.0 (31 Oct) |
+|---|---|---|
+| Verified website | 119 / 119 | 118 / 118 |
+| Company-owned social profiles | 73 / 141 | 69 / 133 |
+| Careers page or job ads | 21 / 25 | 20 / 24 |
+| Dated own-channel posts | 29 / 211 | 27 / 205 |
+
+Every difference, by cause. Register check (−5 sites): MANSOFT, TONEMAKERIET AS (tonemakeriet.no is registered to
+the owner's sole proprietorship, still active), HOPPENSPRETT AKADEMIET AS (hoppensprett.no is registered to
+HOPPENSPRETT AKADEMIET BRÅRUD AS), and two pages already labelled `shared_site` (drommekjokkenet.no, systemhus.no); with
+them go 7 profiles, 9 posts and 2 careers pages. MANSOFT is a NUF, the Norwegian registration of MANSOFT A/S, which
+the register lists separately (form UTLA) with mansoft.dk: one legal person, so the final 1.5.0 commit keeps that site
+(a NUF whose foreign company has the same name owns its site; an AS sharing the domain does not). Re-run on its own
+with the final commit: MANSOFT verified again; SALTEK HOLDING AS, STEINKJER TOMTESELSKAP AS, SAMEIET TINDEN APARTMENTS,
+TRIDENT OPERATIONS AS, TONEMAKERIET AS and HOPPENSPRETT AKADEMIET AS ambiguous; MARINOR AS verified. New guesses (+3 sites):
+marinoras.no (organisation number on the site) and proconsult.as (the full legal name), with 1 profile, 14 posts and a
+careers page; measureit.no (group revenue now counts). The sites themselves changed during the week (−2 sites, −2
+profiles, −12 posts): familierettadvokaten.no and brandiva.no now show a placeholder, and www.nordasa.no's certificate
+no longer matches its name, so its feed could not be read (two other feeds rotated their latest items, +1 post). Network on 24 Oct (+3): ds-betong.no answered 403 then,
+bikefixx.no 429 and aabergeplanteskule.no timed out.
+
+Smoke test (`samples/smoke-100.jsonl`, three passes with the release commit, 31 Oct, committed in `docs/smoke/`):
+100/100 envelopes, validation passed on every pass, 139–146 s per pass, third pass 0 changes and 0 carried-forward
+claims, evidence audit 9,388 / 9,388 excerpts re-found, 100/100 summaries with an overview, 1,463 / 1,463 sentences
+that cite claims carry their sources, 0 dropped. Verified websites 9, as in 1.4.0. The scripted browser check (24
+steps, 1440 px and 390 px) passes on the committed smoke viewer and on the 1,000-company viewer of the release
+candidate, and axe-core 4.14 reports 0 violations on all 10 views. 130 offline unit tests (93 in 1.4.0).
 
 ## Version 1.4.0 (24 Oct): an overview with numbered sources, and a viewer that opens a 1,000-company batch at once
 

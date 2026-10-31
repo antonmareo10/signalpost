@@ -1,9 +1,9 @@
 {
-  "run_id": "run-20261024T071214Z",
-  "agent_version": "1.4.0",
-  "started_at": "2026-10-24T07:12:14Z",
-  "completed_at": "2026-10-24T07:14:05Z",
-  "wall_clock_seconds": 111.4,
+  "run_id": "run-20261031T042352Z",
+  "agent_version": "1.5.0",
+  "started_at": "2026-10-31T04:23:52Z",
+  "completed_at": "2026-10-31T04:26:12Z",
+  "wall_clock_seconds": 139.6,
   "inputs": 100,
   "emitted_envelopes": 100,
   "status_counts": {
@@ -21,8 +21,9 @@
     },
     "website": {
       "available": 9,
-      "not_available": 89,
+      "not_available": 88,
       "ambiguous": 1,
+      "blocked": 1,
       "failed": 1
     },
     "hiring": {
@@ -45,9 +46,9 @@
       "claims": 201
     },
     "brand": {
-      "companies": 3,
-      "company_share": 0.03,
-      "claims": 3
+      "companies": 4,
+      "company_share": 0.04,
+      "claims": 4
     },
     "company_profiles": {
       "companies": 4,
@@ -87,7 +88,7 @@
     "register_history": {
       "companies": 100,
       "company_share": 1.0,
-      "claims": 495
+      "claims": 496
     },
     "website": {
       "companies": 9,
@@ -101,19 +102,19 @@
     }
   },
   "operations": {
-    "requests": 1009,
-    "bytes": 106976754,
-    "p50_request_ms": 688,
-    "p95_request_ms": 1750,
-    "p50_company_ms": 6405,
-    "p95_company_ms": 11453,
+    "requests": 1027,
+    "bytes": 110318892,
+    "p50_request_ms": 764,
+    "p95_request_ms": 1905,
+    "p50_company_ms": 7858,
+    "p95_company_ms": 14094,
     "third_party_cost_usd": 0.0,
     "search_provider": null,
     "search_calls": 0,
     "nav_feed": {
       "state": "available",
-      "pages": 183,
-      "active_ads": 9877,
+      "pages": 189,
+      "active_ads": 9955,
       "matched_companies": 0,
       "error": null
     },
@@ -123,14 +124,14 @@
       "paced_wait_cap_seconds": 300.0
     },
     "top_hosts": {
-      "data.brreg.no": 611,
-      "pam-stilling-feed.nav.no": 184,
+      "data.brreg.no": 622,
+      "pam-stilling-feed.nav.no": 190,
       "www.aelektronikk.no": 6,
       "7-eleven.no": 6,
       "devoldsregnskap.no": 6,
       "stronen.no": 5,
       "svorka.no": 5,
-      "bakkeneiendom.no": 5
+      "atg.no": 5
     }
   },
   "validation": {
@@ -144,6 +145,6 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "previous_envelopes": "run-20261024T071021Z.jsonl",
+  "previous_envelopes": "run-20261031T042132Z.jsonl",
   "viewer": "site/index.html"
 }
