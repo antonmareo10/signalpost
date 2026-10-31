@@ -131,7 +131,9 @@ industry code, contact details, roles).
    for small active ones (no employees, NOK 100k–1M revenue; holding, property and investment companies excluded). If a
    candidate fails for a reason that says nothing about the site (DNS, connection, TLS, timeout, a dead deep link), the
    same registrable domain is tried once more with or without `www` and at its root; a refusal (robots.txt, HTTP
-   401/403/429) is never retried under another spelling.
+   401/403/429) is never retried under another spelling. Since 1.5.0 an AS also gets the two spellings Norwegian
+   companies often register with the legal form, `<name>as.no` and `<name>.as`, and a parent with no revenue of its own
+   that heads an operating group (group revenue NOK 1M+) counts as operating.
 3. **Identity gate** on the fetched site (home page plus contact/about/terms pages, robots.txt respected):
    organisation number printed on the site; or the legal name in the site's identity text together with a registered
    phone/e-mail/street address; or the full legal name *with its legal suffix* (unique in the Register of Business
@@ -146,8 +148,18 @@ industry code, contact details, roles).
    (for the domain of the registered e-mail address, only when it spells the whole legal name). Its pages are not read,
    so no brand, profile, careers page or post comes from it, and the profile says so. A domain that does not resolve
    with or without `www` is reported as gone (`not_available`), not as `blocked`.
+   Since 1.5.0, a site that was inferred rather than registered (from the registered e-mail domain, a NAV ad, a
+   name-derived domain or a search) and that does not print this company's organisation number is checked against
+   Enhetsregisteret's own website field (`enheter?hjemmeside=<domain>` and `underenheter?hjemmeside=<domain>`): if the
+   register lists that website for another organisation (not this company or one of its workplaces), the site is
+   marked `related` and nothing from it is published. In the first 1,000-company batch this caught a holding company
+   that had been given its renamed sister company's website, a company sharing a municipal enterprise's e-mail domain,
+   a housing co-op given its developer's project site and a group company given the group's site. If the register does
+   not answer, the site is reported as not checked rather than published.
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
-   when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded, and a profile linked
+   when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded (since 1.5.0 also a
+   handle that spells a registered role holder's first and last name, unless the company is named after that person),
+   and a profile linked
    from several companies' sites in one batch (web-agency footers) is dropped. Since 1.3.0, when the verified page sits on
    someone else's site (a chain's dealer page, a group's or a manager's site: the page is a sub-page, or the site prints
    another organisation number, or its domain carries none of the company's current names, and the site does not print
@@ -212,7 +224,7 @@ removals. Every run's envelopes are preserved in `history/`.
 
 | Source | Use | Terms |
 |---|---|---|
-| data.brreg.no Enhetsregisteret + Regnskapsregisteret | identity, roles, workplaces, group, accounts, name-uniqueness check | NLOD 2.0 open data |
+| data.brreg.no Enhetsregisteret + Regnskapsregisteret | identity, roles, workplaces, group, accounts, name-uniqueness check, website-owner check (`hjemmeside` search) | NLOD 2.0 open data |
 | data.brreg.no Enhetsregisteret update log (`oppdateringer/enheter?organisasjonsnummer=…`) | dated register history | NLOD 2.0 open data |
 | data.brreg.no Regnskapsregisteret annual-account copies (`aarsregnskap/kopi/{org}/aar`) | list of filed years with the official PDF URL | NLOD 2.0 open data; paced to the published request budget |
 | data.ssb.no KLASS (classification 6, SN2025 with SN2007 fallback) | official English industry labels | Statistics Norway open data (attribution: Statistics Norway) |

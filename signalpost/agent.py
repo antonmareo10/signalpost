@@ -139,6 +139,10 @@ class Agent:
         company_years = [y for y in work.accounts if y.get("account_type") == "SELSKAP"] or work.accounts
         if company_years and "revenue" in company_years[0]:
             revenue = company_years[0]["revenue"]["value"]
+        # A parent that books no revenue itself can still head an operating group (MEASURE IT AS: NOK 158 m group revenue).
+        group_years = [y for y in work.accounts if y.get("account_type") == "KONSERN"]
+        if group_years and "revenue" in group_years[0] and group_years[0]["year"] == (company_years[0]["year"] if company_years else None):
+            revenue = max(revenue or 0, group_years[0]["revenue"]["value"])
         work.company = Company(org=org, name=name, legal_form=(entity.get("organisasjonsform") or {}).get("kode", ""),
                                phones=phones, emails=emails, street=" ".join(address.get("adresse") or []),
                                postcode=address.get("postnummer") or "", city=address.get("poststed") or "",
@@ -190,15 +194,17 @@ class Agent:
             slugs = candidate_slugs(company)
             for brand in company.brands[:2]:
                 slugs += candidate_slugs(Company(org=company.org, name=brand))[:1]
-            for slug in slugs:
-                for tld in (".no", ".com"):
-                    host = slug + tld
-                    if registrable(host) in seen:
-                        continue
-                    if resolve(host):
-                        add("https://" + host, "domain_guess_from_legal_name", "weak", note)
-                    elif resolve("www." + host):  # only the www name exists in DNS: start there
-                        add("https://www." + host, "domain_guess_from_legal_name", "weak", note)
+            hosts = [slug + tld for slug in slugs for tld in (".no", ".com")]
+            if company.legal_form in ("AS", "ASA"):
+                # An AS often registers its name with the legal form: "<name>as.no", or the ".as" domain (marinor.as).
+                hosts += [slug + "as.no" for slug in slugs[:2] if "-" not in slug] + [slug + ".as" for slug in slugs[:2]]
+            for host in hosts:
+                if registrable(host) in seen:
+                    continue
+                if resolve(host):
+                    add("https://" + host, "domain_guess_from_legal_name", "weak", note)
+                elif resolve("www." + host):  # only the www name exists in DNS: start there
+                    add("https://www." + host, "domain_guess_from_legal_name", "weak", note)
         return out
 
     @staticmethod
@@ -284,7 +290,7 @@ class Agent:
                 related = result
             if result.state == "unreachable" and candidate.strength in ("strong", "medium") and "HTTP" not in result.reason:
                 unreachable_own = True  # network failure on the company's own registered domain: we could not check
-            if result.state == "unreachable" and "name search did not answer" in result.reason:
+            if result.state == "unreachable" and "did not answer" in result.reason:
                 unreachable_own = True  # the site answered but the register check behind it did not: keep the previous value
             if result.state == "blocked" and candidate.strength in ("strong", "medium"):
                 blocked = True  # a refused *guess* says nothing about the company's own site

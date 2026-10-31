@@ -51,6 +51,8 @@ def _nok_precise(value: float, extra: int) -> str:
 
 
 def _sentence(text: str, claim_ids: list[str | None], derived: dict[str, float] | None = None, tone: str | None = None) -> dict[str, Any]:
+    if text.endswith("..") and not text.endswith("..."):
+        text = text[:-1]  # a name that ends in a full stop ("CANON EUROPE N.V.") closes the sentence itself
     out = {"text": text, "claim_ids": list(dict.fromkeys(c for c in claim_ids if c)), "derived": derived or {}}
     if tone:
         out["tone"] = tone
@@ -211,11 +213,15 @@ def build_summary(ledger: Ledger, ctx: dict[str, Any]) -> dict[str, Any]:
         latest = rows[0]
         sentence_parts, ids, derived = [], [], {}
         if "revenue" in latest:
-            sentence_parts.append(f"revenue of {nok(latest['revenue']['value'])}")
+            value = latest["revenue"]["value"]
+            sentence_parts.append(f"no revenue ({nok(value)})" if value == 0 else f"revenue of {nok(value)}")
             ids.append(latest["revenue"]["claim_id"])
             previous = rows[1] if len(rows) > 1 else None
             change = _pct_change(latest, previous, "revenue")
-            if change is not None and previous:
+            if change is not None and previous and abs(change) < 0.05:
+                sentence_parts[-1] += f" ({_flat_word(latest, previous, 'revenue')} from {previous['year']})"
+                ids.append(previous["revenue"]["claim_id"])
+            elif change is not None and previous:
                 derived["revenue_change_pct"] = change
                 sentence_parts[-1] += f" ({'up' if change >= 0 else 'down'} {abs(change)}% from {previous['year']})"
                 ids.append(previous["revenue"]["claim_id"])
@@ -546,7 +552,7 @@ def _overview_money(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
             text = f"had{group} revenue of {nok(revenue['value'])}"
             change = _pct_change(latest, previous, "revenue")
             if change is not None and previous and abs(change) < 0.05:
-                text += f", unchanged on {previous['year']}"
+                text += f", {_flat_word(latest, previous, 'revenue')} on {previous['year']}"
                 ids.append(previous["revenue"]["claim_id"])
             elif change is not None and previous:
                 text += f", {'up' if change >= 0 else 'down'} {abs(change)}% on {previous['year']}"
@@ -635,7 +641,7 @@ def _accounts_change(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     derived: dict[str, float] = {}
     change = _pct_change(latest, previous, "revenue")
     if change is not None and abs(change) < 0.05:
-        bits.append(f"revenue was unchanged at {nok(latest['revenue']['value'])}")
+        bits.append(f"revenue was {_flat_word(latest, previous, 'revenue')} at {nok(latest['revenue']['value'])}")
         ids += [latest["revenue"]["claim_id"], previous["revenue"]["claim_id"]]
     elif change is not None:
         before, after = nok_pair(previous["revenue"]["value"], latest["revenue"]["value"])
@@ -650,6 +656,12 @@ def _accounts_change(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         a, b = previous["operating_result"]["value"], latest["operating_result"]["value"]
         if a == b:
             bits.append(f"the operating result was unchanged at {nok(b)}")
+        elif a == 0 or b == 0:
+            # "turned from a profit of NOK 0" reads as if there had been a profit: say break-even instead.
+            if a == 0:
+                bits.append(f"the operating result went from break-even ({nok(a)}) to a {'profit' if b > 0 else 'loss'} of {nok(abs(b))}")
+            else:
+                bits.append(f"the operating result went from a {'profit' if a > 0 else 'loss'} of {nok(abs(a))} to break-even ({nok(b)})")
         elif (a >= 0) != (b >= 0):
             before, after = nok_pair(abs(a), abs(b))
             bits.append(f"the operating result turned from a {'profit' if a >= 0 else 'loss'} of {before} "
@@ -667,6 +679,11 @@ def _accounts_change(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         return None
     group = " group" if latest.get("account_type") == "KONSERN" else ""
     return _sentence(f"Between the {previous['year']} and {latest['year']}{group} accounts, " + "; ".join(bits) + ".", ids, derived)
+
+
+def _flat_word(latest: dict[str, Any], previous: dict[str, Any], field: str) -> str:
+    """For a change that rounds to 0.0%: "unchanged" only when the two filed values are identical."""
+    return "unchanged" if latest[field]["value"] == previous[field]["value"] else "almost unchanged"
 
 
 def _pct_change(latest: dict[str, Any], previous: dict[str, Any] | None, field: str) -> float | None:

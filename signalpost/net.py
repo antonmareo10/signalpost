@@ -201,6 +201,12 @@ class Fetcher:
                 attempt += 1
                 time.sleep(1.5 * attempt)
                 continue
+            if result.status == 429 and attempt < 2 and (urllib.parse.urlsplit(url).hostname or "").lower() not in self.api_hosts:
+                # "Too many requests" is a request to slow down, not a refusal: many small shops share one platform edge
+                # (Shopify's), which rate-limits all of them together while the batch runs. Wait and ask again, twice at most.
+                attempt += 1
+                time.sleep(3.0 * attempt)
+                continue
             break
         if snapshot and result.body and self.snapshot_dir:
             self._persist(result)

@@ -283,6 +283,11 @@ def domain_match(company: Company, host: str) -> tuple[bool, bool]:
     dist = [domain_key(t) for t in distinctive(core)]
     full = bool(joined and (label == joined or (len(joined) >= 6 and joined in label))) or \
         bool(joined_full and len(joined_full) >= 6 and label == joined_full)
+    # Norwegian companies often register the name together with its legal form: wifixas.no or remme-bygg-as.no for an AS.
+    suffix = (company.legal_form or "").lower()
+    raw = re.sub(r"[^a-z0-9]", "", fold(registrable(host).split(".")[0]))  # before the å/aa folding: "aidaas" is AIDA + AS
+    if not full and suffix in ("as", "asa") and len(joined) >= 4 and raw.endswith(suffix):
+        full = domain_key(raw[: -len(suffix)]) in (joined, joined_full)
     named = full or bool(dist and all(t in label for t in dist) and sum(len(t) for t in dist) >= 5)
     return full, named
 
@@ -300,6 +305,7 @@ class SiteResearcher:
         self.fetcher = fetcher
         self.max_pages = max_pages
         self._unique_cache: dict[str, bool] = {}
+        self._owner_cache: dict[str, list[dict[str, str]]] = {}
         self._unique_lock = threading.Lock()
 
     # -- fetching ----------------------------------------------------------------------------
@@ -364,8 +370,45 @@ class SiteResearcher:
                     if proof["orgnr"]:
                         break
         decision, confidence, reason = self._decide(company, candidate, proof, final_host)
+        if decision == "verified" and candidate.strength != "strong" and not proof["orgnr"]:
+            # A site we inferred (from a shared e-mail domain, a guess or a search) may be the registered website of another
+            # company: the sister company that now carries the old name (saltek.no is SALTEK AS's, not SALTEK HOLDING AS's),
+            # the municipal enterprise behind a shared e-mail address, the developer of a housing project. The register says
+            # whose it is, so ask it before publishing. A site that prints this company's organisation number is not affected.
+            owners = self._registered_owners(company, {registrable(final_host), registrable(host_of(candidate.url))})
+            proof["registered_to_others"] = owners
+            if owners is None:
+                decision, confidence, reason = ("unreachable", 0.0, "the register's website lookup did not answer, so the site's "
+                                                                    "owner could not be checked")
+            elif owners:
+                decision, confidence, reason = ("related", 0.5, "the register lists this website for another organisation "
+                                                                f"({', '.join(o['org'] for o in owners[:2])})")
         return SiteResult(candidate, decision, reason, home_url=result.final_url or candidate.url, pages=pages, proof=proof,
                           confidence=confidence)
+
+    def _registered_owners(self, company: Company, domains: set[str]) -> list[dict[str, str]] | None:
+        """Other registered entities (not this company or its own workplaces) whose registered website is on one of
+        ``domains``, from Enhetsregisteret's search on the website field. None when the register did not answer."""
+        owners: list[dict[str, str]] = []
+        for domain in sorted(d for d in domains if d):
+            with self._unique_lock:
+                cached = self._owner_cache.get(domain)
+            if cached is None:
+                cached = []
+                for kind in ("enheter", "underenheter"):
+                    url = (f"https://data.brreg.no/enhetsregisteret/api/{kind}?hjemmeside={urllib.parse.quote(domain)}&size=100")
+                    result = self.fetcher.get(url, accept="application/json", retries=2, snapshot=False)
+                    if not result.ok:
+                        return None
+                    for item in ((result.json() or {}).get("_embedded") or {}).get(kind, []):
+                        listed = normalize_site_url(item.get("hjemmeside"))
+                        if listed and registrable(host_of(listed)) == domain:
+                            cached.append({"org": str(item.get("organisasjonsnummer") or ""), "parent": str(item.get("overordnetEnhet") or "")})
+                with self._unique_lock:
+                    self._owner_cache[domain] = cached
+            owners += [o for o in cached if company.org not in (o["org"], o["parent"])]
+        unique = {o["parent"] or o["org"]: o for o in owners}
+        return [{"org": org} for org in unique]
 
     def _priority_links(self, page: Page, host: str) -> list[str]:
         seen: set[str] = set()
@@ -767,6 +810,22 @@ def foreign_entity_handle(company: Company, url: str) -> bool:
     return bool((stem & GROUP_WORDS) - set().union(*own_names))
 
 
+def personal_handle(company: Company, url: str) -> bool:
+    """A handle that spells a registered role holder's first and last name ("denniskiil" on KIIL MGMT AS's site) is that
+    person's own page, unless the company itself is named after the person (LARS AARUM AS and facebook.com/LarsAarum)."""
+    parts = urllib.parse.urlsplit(url)
+    compact = domain_key(urllib.parse.unquote(parts.path + "?" + parts.query))
+    own = {domain_key(t) for t in company.core}
+    for person in company.people:
+        toks = [domain_key(t) for t in tokens(person)]
+        if len(toks) < 2 or any(t in LEGAL_FORMS for t in toks) or min(len(toks[0]), len(toks[-1])) < 2:
+            continue
+        first, last = toks[0], toks[-1]
+        if (first + last in compact or last + first in compact) and not (first in own and last in own):
+            return True
+    return False
+
+
 def handle_matches(company: Company, url: str, brand: str | None, site_host: str) -> bool:
     """Does the profile handle name the company (legal name, former names, brand, workplace brands, domain, initials)?"""
     parts = urllib.parse.urlsplit(url)
@@ -945,7 +1004,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
             keep = [i for i in items if own_handle_on_shared_site(company, i["url"], site_host)][:2]
         else:
             matching = [i for i in items if handle_matches(company, i["url"], out["brand"], site_host)
-                        and not foreign_entity_handle(company, i["url"])]
+                        and not foreign_entity_handle(company, i["url"]) and not personal_handle(company, i["url"])]
             opaque = [i for i in items if opaque_handle(i["url"]) and i not in matching]
             keep = matching[:2] if matching else (opaque[:1] if len(items) == 1 else [])
         for item in keep:
@@ -1096,7 +1155,7 @@ def feed_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: int = 
                 sample_dates.append(iso)
                 continue
             if title and link and iso and iso <= _today() and host_of(link).endswith(registrable(site_host)) \
-                    and not demo_content(body) and not (not_before and iso < not_before):
+                    and not demo_content(body) and not test_post(title) and not (not_before and iso < not_before):
                 items.append((iso, title, link, raw_date))
         items = [item for item in items if not after_install_demo(item[0], sample_dates)]
         items.sort(reverse=True)
@@ -1123,6 +1182,12 @@ def _today() -> str:
 # The sample post WordPress creates on installation ("Hello world!", "Hei, verden!"): a date, but no activity.
 PLACEHOLDER_POSTS = {"hello world", "hei verden", "hallo verden", "hej verden", "hej varlden", "hallo welt", "hola mundo",
                      "bonjour tout le monde", "ciao mondo", "ola mundo", "hei maailma", "witaj swiecie"}
+
+
+def test_post(title: str) -> bool:
+    """"Test", "TEst 2 – hubspot", "Testinnlegg": a post someone published to try the site, not company activity."""
+    toks = tokens(title)
+    return bool(toks) and toks[0] in {"test", "testing", "testinnlegg", "testpost", "testartikkel", "testside"}         and (len(toks) <= 2 or any(t.isdigit() for t in toks[1:3]))
 
 
 def placeholder_post(title: str) -> bool:
@@ -1178,7 +1243,7 @@ def wordpress_posts(fetcher: Fetcher, ledger: Ledger, site: SiteResult, limit: i
         excerpt = item.get("excerpt") or {}
         excerpt_text = str(excerpt.get("rendered") if isinstance(excerpt, dict) else excerpt or "")
         if not (title and link and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) and iso <= _today() and host_of(link).endswith(site_root)) \
-                or placeholder_post(title) or demo_content(excerpt_text) or (not_before and iso < not_before) \
+                or placeholder_post(title) or test_post(title) or demo_content(excerpt_text) or (not_before and iso < not_before) \
                 or after_install_demo(iso, [d for d in sample_dates if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)]):
             continue
         link = clean_url(link)
@@ -1211,7 +1276,8 @@ def jsonld_posts(ledger: Ledger, site: SiteResult, not_before: str | None = None
             url = str(item.get("url") or (main_entity.get("@id", "") if isinstance(main_entity, dict) else main_entity or ""))
             if url and not host_of(url).endswith(registrable(host_of(site.home_url))):
                 continue
-            if not (title and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)) or placeholder_post(title) or (not_before and date < not_before):
+            if not (title and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)) or placeholder_post(title) or test_post(title) \
+                    or (not_before and date < not_before):
                 continue
             line = next((l for l in doc.text.split("\n") if l.startswith("[json-ld]") and title[:40] in l and date in l), None)
             if not line:

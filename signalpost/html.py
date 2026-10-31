@@ -87,6 +87,7 @@ class _Parser(HTMLParser):
         self.header_chunks: list[str] = []
         self.in_title = False
         self.title_chunks: list[str] = []
+        self.svg_depth = 0
         self.current_link: dict[str, Any] | None = None
         self.in_jsonld = False
         self.jsonld_chunks: list[str] = []
@@ -127,8 +128,11 @@ class _Parser(HTMLParser):
             self.stack.append(tag + "#header")
         elif tag not in {"img", "br", "hr", "input", "meta", "link", "source", "wbr", "area", "col", "embed", "param", "track"}:
             self.stack.append(tag)
-        if tag == "title":
+        if tag == "title" and not self.page.title and not self.title_chunks and not self.svg_depth:
+            # the document's own title only: icons' <title> inside inline SVG ("Facebook icon") are not part of it
             self.in_title = True
+        if tag == "svg":
+            self.svg_depth += 1
         if tag in BLOCK:
             self._emit("\n")
         if tag == "a" and a.get("href"):
@@ -151,7 +155,9 @@ class _Parser(HTMLParser):
                 pass
         if tag in SKIP and tag != "head" and self.skip_depth:
             self.skip_depth -= 1
-        if tag == "title":
+        if tag == "svg" and self.svg_depth:
+            self.svg_depth -= 1
+        if tag == "title" and self.in_title:
             self.in_title = False
             self.page.title = re.sub(r"\s+", " ", "".join(self.title_chunks)).strip()
         if tag == "a" and self.current_link is not None:
