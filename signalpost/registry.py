@@ -14,7 +14,7 @@ import time
 from datetime import date, timedelta
 from typing import Any
 
-from .ledger import Document, Ledger, canonical_json
+from .ledger import Document, Ledger, canonical_json, utc_date
 from .net import Fetcher, FetchResult, persist_snapshot
 
 ENTITY = "https://data.brreg.no/enhetsregisteret/api/enheter/{org}"
@@ -470,11 +470,14 @@ def update_claims(ledger: Ledger, result: FetchResult, today: str, months: int =
     items = ((doc.data or {}).get("_embedded") or {}).get("oppdaterteEnheter") or []
     cutoff = (date.fromisoformat(today) - timedelta(days=int(months * 30.5))).isoformat()
     events: list[dict[str, Any]] = []
-    order = sorted(range(len(items)), key=lambda i: items[i].get("dato") or "", reverse=True)
+    # The same update comes back dated "...T22:05:37Z" or "...T00:05:37+02:00" depending on the server: use its UTC date,
+    # so that a refresh does not see a new event when only the serialisation changed.
+    order = sorted(range(len(items)), key=lambda i: (utc_date(items[i].get("dato")) or (items[i].get("dato") or "")[:10],
+                                                     items[i].get("oppdateringsid") or 0), reverse=True)
     for index in order:
         item = items[index]
         changes = item.get("endringer") or []
-        day = (item.get("dato") or "")[:10]
+        day = utc_date(item.get("dato")) or (item.get("dato") or "")[:10]
         if not changes or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or day < cutoff:
             continue
         fields: list[str] = []

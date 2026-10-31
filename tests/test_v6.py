@@ -234,5 +234,33 @@ class TooManyRequestsTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
+class RegisterDateTests(unittest.TestCase):
+    """Brønnøysund serialises one update as UTC or as Oslo time depending on the server; the event date must not move."""
+    def claims_for(self, stamp: str):
+        from signalpost.registry import update_claims
+        from test_v2 import fetched
+        body = {"_embedded": {"oppdaterteEnheter": [
+            {"oppdateringsid": 22005082, "dato": stamp, "organisasjonsnummer": "936056210", "endringstype": "Endring",
+             "endringer": [{"op": "replace", "path": "/naeringskode1/kode", "value": "62.010"}]}]}}
+        ledger = Ledger("936056210")
+        state, events = update_claims(ledger, fetched("https://data.brreg.no/enhetsregisteret/api/oppdateringer/enheter", body),
+                                      "2026-10-31")
+        self.assertEqual(state, "available")
+        return [(c["key"], c["value"]) for c in ledger.claims]
+
+    def test_the_same_update_has_the_same_date_whichever_server_answers(self):
+        utc = self.claims_for("2025-09-01T22:05:37.005Z")
+        oslo = self.claims_for("2025-09-02T00:05:37.005+02:00")
+        self.assertEqual(utc, oslo)
+        self.assertEqual(utc[0][1], "2025-09-01")
+
+    def test_utc_date(self):
+        from signalpost.ledger import supports, utc_date
+        self.assertEqual(utc_date("2025-11-13T00:30:00+01:00"), "2025-11-12")
+        self.assertEqual(utc_date("2025-11-13T10:26:22.377Z"), "2025-11-13")
+        self.assertIsNone(utc_date("2025-09-01"))
+        self.assertTrue(supports("2025-09-01", '{"dato":"2025-09-02T00:05:37.005+02:00"}'))
+        self.assertFalse(supports("2025-09-03", '{"dato":"2025-09-02T00:05:37.005+02:00"}'))
+
 if __name__ == "__main__":
     unittest.main()

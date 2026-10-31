@@ -15,6 +15,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 # Plain-English names of the source classes, shared by the summary's source list and the viewer.
@@ -91,6 +92,24 @@ def _numbers_in(text: str) -> set[float]:
     return found
 
 
+TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})")
+
+
+def utc_date(timestamp: str | None) -> str | None:
+    """The UTC calendar date of an ISO timestamp that carries its offset.
+
+    Brønnøysund's API serialises the same instant either in UTC ("2025-09-01T22:05:37.005Z") or in Oslo time
+    ("2025-09-02T00:05:37.005+02:00") depending on which server answers, so the first ten characters are not a stable
+    date. The UTC date is: it is also the date the register's own fields give for the change (the nightly batch that
+    records "registreringsdatoAntallAnsatteEnhetsregisteret": "2025-10-15" is stamped 2025-10-15T22:08Z)."""
+    if not timestamp or not TIMESTAMP_RE.fullmatch(timestamp.strip()):
+        return None
+    try:
+        return datetime.fromisoformat(timestamp.strip().replace("Z", "+00:00")).astimezone(timezone.utc).date().isoformat()
+    except ValueError:
+        return None
+
+
 def supports(value: Any, span: str) -> bool:
     """True when ``span`` (the cited excerpt) contains the claimed value."""
     if value is None:
@@ -111,7 +130,8 @@ def supports(value: Any, span: str) -> bool:
         return bare in re.sub(r"https?://(www\.)?", "", span.lower())
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
         y, m, d = text.split("-")
-        return text in span or f"{d}.{m}.{y}" in span or f"{int(d)}.{int(m)}.{y}" in span
+        return text in span or f"{d}.{m}.{y}" in span or f"{int(d)}.{int(m)}.{y}" in span \
+            or any(utc_date(stamp) == text for stamp in TIMESTAMP_RE.findall(span))
     wanted = tokens(text)
     have = set(tokens(span))
     return bool(wanted) and all(token in have for token in wanted)
