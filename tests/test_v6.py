@@ -135,6 +135,20 @@ class SummaryWordingTests(OverviewTests):
         self.assertIn("the operating result went from a profit of NOK 7 k to break-even (NOK 0)", " ".join(s["parts"]["what_changed"]))
         self.assertEqual(s["dropped_unsupported_sentences"], 0)
 
+    def test_an_ambiguous_website_says_why_without_naming_the_other_company(self):
+        for note, words in (("https://www.saltek.no/: the register lists this website for another organisation (913207521)",
+                             "listed in the register as another organisation's website"),
+                            ("https://www.usbl.no: registered website shares the company's contact details but names another "
+                             "business (group/manager site)", "shares the company's contact details but names another business"),
+                            ("https://x.no: site shows another organisation number (992795808)", "prints another organisation number")):
+            _, s = self.summary([year(2025, 500_000, 7_000, 20_000, 48_000)],
+                                states={"website": "ambiguous", "hiring": "not_available"}, notes={"website": note})
+            gap = next(t for t in s["parts"]["unknown"] if "a verified website" in t)
+            self.assertTrue(gap.startswith("Ambiguous: a verified website ("), gap)
+            self.assertIn(words, gap)
+            self.assertNotIn("http", gap)
+            self.assertNotRegex(gap, r"\d{9}")
+
     def test_a_name_ending_in_a_full_stop_closes_the_sentence(self):
         self.assertEqual(_sentence("Its registered parent is CANON EUROPE N.V..", [])["text"], "Its registered parent is CANON EUROPE N.V.")
         self.assertEqual(_sentence("It says: “more to come...”", [])["text"], "It says: “more to come...”")

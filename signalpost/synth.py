@@ -721,7 +721,20 @@ def _unknown_sentence(detail: dict[str, Any], discovery: list[dict[str, Any]]) -
     tried: list[dict[str, Any]] = []
     if item == "a verified website":
         if state == "ambiguous":
-            reason = "a candidate site prints another organisation number, so it may belong to a related company and nothing was published from it"
+            # say why without naming the other company or its site
+            if "register lists this website for another organisation" in reason:
+                reason = ("a candidate site is listed in the register as another organisation's website, so nothing was "
+                          "published from it")
+            elif "another legal form" in reason:
+                reason = "the registered website names a company with another legal form, so nothing was published from it"
+            elif "contact details but names another business" in reason:
+                reason = ("the registered website shares the company's contact details but names another business (a group or "
+                          "manager site), so nothing was published from it")
+            elif "another organisation number" in reason:
+                reason = ("a candidate site prints another organisation number, so it may belong to a related company and "
+                          "nothing was published from it")
+            else:
+                reason = "a candidate site may belong to a related company, so nothing was published from it"
         tried = [d for d in discovery if d.get("outcome") != "verified"]
         if tried:
             kinds = list(dict.fromkeys(DISCOVERY_WORDS.get(d.get("source"), "other candidates") for d in tried))
