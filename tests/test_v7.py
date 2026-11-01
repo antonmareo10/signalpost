@@ -7,29 +7,36 @@ for 1,000 new companies (seed 20261101).
   and its subsidiaries' pages, BAUTA CONSTRUCTION AS and BAUTA GROUP AS's).
 - Facebook's "/p/<Name>-<id>/" pages are read without the id (Brokke-VVS-as-61552198067839 is BROKKE VVS AS).
 - No revenue percentage from a negative filed year ("up 16796.2%" from NOK -11 k to NOK 1.9 m).
+- The domain of the registered e-mail address that refuses the crawler goes through the register's website check too.
+- Published URLs carry no session id (vertshusetfrisor.no/c;jsessionid=...), so a refresh sees no false change.
+- An identity proof is cited when the address is printed over two lines, or the number sits at the end of the page.
 Run: python -m unittest discover -s tests"""
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from signalpost.agent import Agent  # noqa: E402
-from signalpost.ledger import Ledger  # noqa: E402
+from signalpost.agent import Agent, Work  # noqa: E402
+from signalpost.ledger import Document, Ledger  # noqa: E402
 from signalpost.registry import group_claims  # noqa: E402
 from signalpost.synth import _pct_change, check_sentence  # noqa: E402
-from signalpost.web import Candidate, Company, SiteResearcher, extract_site, foreign_entity_handle, shared_site  # noqa: E402
+from signalpost.web import (Candidate, Company, SiteResearcher, SiteResult, extract_site, foreign_entity_handle,  # noqa: E402
+                            shared_site)
 from test_v2 import fetched  # noqa: E402
 from test_v4 import FakeFetcher, result, site  # noqa: E402
 from test_v5 import OverviewTests, year  # noqa: E402
 
 
-def research(company: Company, url: str, html: str, source: str = "registry_website", strength: str = "strong"):
-    fetcher = FakeFetcher({url: lambda u: result(u, html.encode("utf-8"), "text/html; charset=UTF-8")})
+def research(company: Company, url: str, html: str, source: str = "registry_website", strength: str = "strong",
+             extra: dict | None = None):
+    fetcher = FakeFetcher({url: lambda u: result(u, html.encode("utf-8"), "text/html; charset=UTF-8"), **(extra or {})})
     return SiteResearcher(fetcher).research(company, Candidate(url, source, strength))
 
 
@@ -177,6 +184,125 @@ class NegativeBaseRevenueTests(OverviewTests):
         self.assertIsNone(_pct_change(*rows(1_851_104, -11_087), "revenue"))
         self.assertIsNone(_pct_change(*rows(-50_000, 100_000), "revenue"))
         self.assertIsNone(_pct_change(*rows(100_000, 0), "revenue"))
+
+
+def listing_work(org: str, name: str, email: str) -> Work:
+    entity = {"organisasjonsnummer": org, "navn": name, "epostadresse": email}
+    work = Work(org, Ledger(org))
+    doc = Document(url=f"https://data.brreg.no/enhetsregisteret/api/enheter/{org}", source_class="official_registry_live",
+                   retrieved_at="2026-11-01T00:00:00Z", sha256="c" * 64, text=json.dumps(entity), data=entity)
+    work.ledger.json_claim(doc, "/epostadresse", "identity", "registered_email")
+    work.company = Company(org=org, name=name, legal_form="AS", emails={email})
+    work.entity = entity
+    return work
+
+
+def hjemmeside(domain: str, items: list[dict] | None):
+    """Register answers for the website-field search (None: the register does not answer)."""
+    answers = {}
+    for kind in ("enheter", "underenheter"):
+        url = f"https://data.brreg.no/enhetsregisteret/api/{kind}?hjemmeside={domain}&size=100"
+        if items is None:
+            continue
+        body = {"_embedded": {kind: items}} if items and kind == "enheter" else {"page": {"totalElements": 0}}
+        answers[url] = (lambda b: lambda u: result(u, json.dumps(b).encode("utf-8"), "application/json"))(body)
+    return answers
+
+
+class EmailDomainListingCheckTests(unittest.TestCase):
+    """A shared e-mail domain whose site refuses the crawler is the Saltek risk: the sister company that owns the domain."""
+    candidate = Candidate("https://marinor.no", "registry_email_domain", "medium")
+    refusal = SiteResult(candidate, "blocked", "site refused automated access (HTTP 403)")
+
+    def run_footprint(self, answers: dict):
+        agent = Agent(run_id="t", snapshot_dir=None, cache_dir=None, workers=1, use_search=False, log=lambda *a: None)
+        agent.sites = SiteResearcher(FakeFetcher(answers))
+        work = listing_work("999888777", "MARINOR AS", "post@marinor.no")
+        with mock.patch.object(agent, "candidates", return_value=[self.candidate]), \
+                mock.patch.object(agent.sites, "research", return_value=self.refusal), \
+                mock.patch.object(agent.nav, "claims", return_value=[]):
+            agent.footprint(work)
+        return work
+
+    def test_a_domain_the_register_lists_for_another_organisation_is_related(self):
+        work = self.run_footprint(hjemmeside("marinor.no", [{"organisasjonsnummer": "913207521", "navn": "MARINOR SERVICE AS",
+                                                               "hjemmeside": "www.marinor.no", "organisasjonsform": {"kode": "AS"}}]))
+        self.assertIsNone(work.ledger.first("official_website"))
+        self.assertEqual(work.states["website"], "ambiguous")
+        self.assertIn("register lists this website for another organisation", work.notes["website"])
+        self.assertEqual(work.discovery[0]["outcome"], "related")
+
+    def test_no_answer_from_the_register_is_not_checked_not_published(self):
+        work = self.run_footprint(hjemmeside("marinor.no", None))
+        self.assertIsNone(work.ledger.first("official_website"))
+        self.assertEqual(work.states["website"], "failed")
+        self.assertIn("did not answer", work.notes["website"])
+
+    def test_a_domain_nobody_else_lists_is_still_published_from_the_register(self):
+        work = self.run_footprint(hjemmeside("marinor.no", []))
+        website = work.ledger.first("official_website")
+        self.assertEqual((website["value"], website["basis"]), ("https://marinor.no", "registry_listing"))
+        self.assertEqual(work.states["website"], "available")
+
+
+class SessionIdTests(unittest.TestCase):
+    def test_the_published_website_carries_no_session_id(self):
+        company = Company(org="926757504", name="VERTSHUSET FRISØR AS", legal_form="AS")
+        values = []
+        for session in ("ZoIl3-_DQa94jvXoOt7PZ01sU8VXxClijMPOcUge.timebok", "8Te05MwelBmIWkHzx__7oq2U6kU1p8IRLKWF8L-i.timebok"):
+            s = site(f"https://vertshusetfrisor.no/c;jsessionid={session}?0",
+                     "<html><head><title>Timebooking</title></head><body>Vertshuset Frisør AS</body></html>")
+            s.proof = {"orgnr": None, "other_orgnrs": []}
+            ledger = Ledger(company.org)
+            extract_site(ledger, company, s)
+            values.append(ledger.first("official_website")["value"])
+        self.assertEqual(values, ["https://vertshusetfrisor.no/c?0"] * 2)
+
+    def test_session_parameters_go_and_everything_else_stays(self):
+        from signalpost.web import strip_session_ids
+        self.assertEqual(strip_session_ids("https://x.no/a?PHPSESSID=abc&id=7"), "https://x.no/a?id=7")
+        self.assertEqual(strip_session_ids("https://x.no/a?id=7&sid=9#top"), "https://x.no/a?id=7#top")
+        self.assertEqual(strip_session_ids("https://x.no/side;jsessionid=AB12/kontakt?jsessionid=1"), "https://x.no/side/kontakt")
+        self.assertEqual(strip_session_ids("https://x.no/a?ASPSESSIONIDQQ=1&b=2&c"), "https://x.no/a?b=2&c")
+        for unchanged in ("https://x.no/a?0", "https://x.no/", "https://x.no/a?side=2&sort=pris", "https://x.no/a?b=1+2&c=%C3%A5"):
+            self.assertEqual(strip_session_ids(unchanged), unchanged)
+
+    def test_a_careers_link_carries_no_session_id(self):
+        company = Company(org="1", name="FØRLAND RØR AS")
+        s = site("https://www.forlandror.no", "<html><body>Førland Rør AS"
+                                              "<a href='https://www.forlandror.no/ledige-stillinger/?PHPSESSID=77aa'>Ledige stillinger</a></body></html>")
+        s.proof = {"orgnr": None, "other_orgnrs": []}
+        ledger = Ledger(company.org)
+        extract_site(ledger, company, s)
+        self.assertEqual(ledger.first("careers_page")["value"], "https://www.forlandror.no/ledige-stillinger/")
+
+
+class IdentityProofExcerptTests(unittest.TestCase):
+    def test_an_address_over_two_lines_is_cited(self):
+        html = ("<html><head><title>LilleLi Smykker</title></head><body><h1>LilleLi Smykker</h1><p>Sølvsmykker laget i Alta.</p>"
+                "<footer><div>LilleLi AS</div><div>Minkveien 6</div><div>9512 ALTA</div><div>Telefon: 91741123</div>"
+                "</footer></body></html>")
+        company = Company(org="828354922", name="LILLELI AS", legal_form="AS", street="Minkveien 6", postcode="9512", city="ALTA")
+        found = research(company, "https://lilleli.no", html, "domain_guess_from_legal_name", "weak", hjemmeside("lilleli.no", []))
+        self.assertEqual(found.state, "verified")
+        ledger = Ledger(company.org)
+        extract_site(ledger, company, found)
+        proof = ledger.first("website_identity_proof")
+        self.assertEqual((proof["proof_kind"], proof["value"]), ("address", "Minkveien 6 9512 ALTA"))
+
+    def test_an_organisation_number_at_the_end_of_the_page_is_cited(self):
+        # lius.no: the number is the page's last line, so a window cut from the page text plus its meta tags ran into
+        # "viewport: width=device-width", which the cited page text does not contain.
+        html = ("<html><head><title>Lius | Gründerhus og kontorfellesskap i Lørenskog</title>"
+                "<meta name='viewport' content='width=device-width, initial-scale=1'></head><body><h1>Lius</h1>"
+                "<p>Kontorplass, coworking og møterom på Skårersletta 69.</p>"
+                "<footer>© 2026 Skårersletta 69 AS - 935 637 767. Nettside av Digitelle.</footer></body></html>")
+        company = Company(org="935637767", name="LIUS AS", legal_form="AS")
+        found = research(company, "https://lius.no", html, "domain_guess_from_legal_name", "weak")
+        self.assertEqual(found.state, "verified")
+        ledger = Ledger(company.org)
+        extract_site(ledger, company, found)
+        self.assertEqual(ledger.first("website_identity_proof")["value"], "935 637 767")
 
 
 if __name__ == "__main__":

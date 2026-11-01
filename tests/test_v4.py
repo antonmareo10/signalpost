@@ -15,7 +15,7 @@ from signalpost.agent import Agent, Work  # noqa: E402
 from signalpost.html import parse_html  # noqa: E402
 from signalpost.ledger import Document, Ledger  # noqa: E402
 from signalpost.net import FetchResult, _to_text  # noqa: E402
-from signalpost.web import (Candidate, Company, SiteResearcher, SiteResult, clean_url, domain_match, extract_site,  # noqa: E402
+from signalpost.web import (Candidate, Company, SiteResearcher, SiteResult, clean_url, domain_match, extract_site, host_of, registrable,  # noqa: E402
                             feed_posts, is_wordpress, shared_site, wordpress_posts)
 
 HOME = ("<html><head><title>Måsøval</title><meta name='generator' content='WordPress 7.0.2'>"
@@ -134,6 +134,17 @@ class DomainTests(unittest.TestCase):
 
 
 class RegisteredSiteRefusingAccessTests(unittest.TestCase):
+    @staticmethod
+    def listing(work: Work, refused, answers: dict | None = None):
+        """The published listing (or None). An e-mail domain is checked against the register's website field, which
+        answers "nobody else lists it" here unless ``answers`` says otherwise."""
+        agent = Agent(run_id="t", snapshot_dir=None, cache_dir=None, workers=1, use_search=False, log=lambda *a: None)
+        empty = lambda url: result(url, json.dumps({"page": {"totalElements": 0}}).encode("utf-8"), "application/json")  # noqa: E731
+        agent.sites = SiteResearcher(FakeFetcher(answers if answers is not None else {
+            url: empty for cand, _ in refused for kind in ("enheter", "underenheter")
+            for url in [f"https://data.brreg.no/enhetsregisteret/api/{kind}?hjemmeside={registrable(host_of(cand.url))}&size=100"]}))
+        return agent._registered_site_refusing_access(work, refused)[0]
+
     def _work(self, name: str, entity: dict) -> Work:
         work = Work("996840506", Ledger("996840506"))
         doc = Document(url="https://data.brreg.no/enhetsregisteret/api/enheter/996840506", source_class="official_register",
@@ -149,7 +160,7 @@ class RegisteredSiteRefusingAccessTests(unittest.TestCase):
         work = self._work("HIGHSOFT AS", {"hjemmeside": "www.highsoft.com"})
         refused = [(Candidate("https://www.highsoft.com", "registry_website", "strong"),
                     SiteResult(Candidate("https://www.highsoft.com", "registry_website", "strong"), "blocked", "robots.txt disallows this URL"))]
-        site_info = Agent._registered_site_refusing_access(work, refused)
+        site_info = self.listing(work, refused)
         self.assertIsNotNone(site_info)
         claim = work.ledger.first("official_website")
         self.assertEqual(claim["basis"], "registry_listing")
@@ -161,7 +172,7 @@ class RegisteredSiteRefusingAccessTests(unittest.TestCase):
         refused = [(Candidate("https://www.norian.no/eiendom", "registry_website", "strong"),
                     SiteResult(Candidate("https://www.norian.no/eiendom", "registry_website", "strong"), "blocked",
                                "site refused automated access (HTTP 403)"))]
-        self.assertIsNone(Agent._registered_site_refusing_access(work, refused))
+        self.assertIsNone(self.listing(work, refused))
         self.assertIsNone(work.ledger.first("official_website"))
 
     def test_email_domain_needs_the_whole_legal_name(self):
@@ -169,18 +180,18 @@ class RegisteredSiteRefusingAccessTests(unittest.TestCase):
         refused = [(Candidate("https://canon.no", "registry_email_domain", "medium"),
                     SiteResult(Candidate("https://canon.no", "registry_email_domain", "medium"), "blocked",
                                "site refused automated access (HTTP 403)"))]
-        self.assertIsNone(Agent._registered_site_refusing_access(work, refused))
+        self.assertIsNone(self.listing(work, refused))
         work = self._work("GEOPROVIDER AS", {"epostadresse": "post@geoprovider.no"})
         refused = [(Candidate("https://geoprovider.no", "registry_email_domain", "medium"),
                     SiteResult(Candidate("https://geoprovider.no", "registry_email_domain", "medium"), "blocked",
                                "site refused automated access (HTTP 403)"))]
-        self.assertIsNotNone(Agent._registered_site_refusing_access(work, refused))
+        self.assertIsNotNone(self.listing(work, refused))
 
     def test_a_dead_domain_is_not_a_refusal(self):
         work = self._work("HAZL AS", {"hjemmeside": "www.hazl.no"})
         refused = [(Candidate("https://www.hazl.no", "registry_website", "strong"),
                     SiteResult(Candidate("https://www.hazl.no", "registry_website", "strong"), "gone", "the domain does not resolve"))]
-        self.assertIsNone(Agent._registered_site_refusing_access(work, refused))
+        self.assertIsNone(self.listing(work, refused))
 
 
 if __name__ == "__main__":

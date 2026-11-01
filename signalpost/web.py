@@ -19,7 +19,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 from .html import Page, parse_html
-from .ledger import Document, Ledger, canonical_json, excerpt_around, fold, tokens
+from .ledger import Document, Ledger, canonical_json, excerpt_around, fold, squash, tokens
 from .net import Fetcher, FetchResult
 
 LEGAL_FORMS = {"as", "asa", "sa", "da", "ans", "nuf", "ba", "ks", "enk", "sti", "iks", "kf", "hf", "bl", "ab", "ltd", "limited",
@@ -453,7 +453,10 @@ class SiteResearcher:
                 number = "".join(match.groups())
                 if number == company.org and not proof["orgnr"]:
                     # keep the number as printed ("971 456 329"): the cited excerpt must contain the claimed value
-                    proof["orgnr"] = {"url": result.url, "excerpt": excerpt_around(raw_text, match.group(0)), "value": match.group(0).strip()}
+                    # The excerpt comes from the visible text (or the evidence text for a number in a meta tag): a window
+                    # cut from raw_text can run into its "name: value" meta lines, which the cited page text does not contain.
+                    excerpt = excerpt_around(text, match.group(0)) or excerpt_around(page.evidence_text(), match.group(0))
+                    proof["orgnr"] = {"url": result.url, "excerpt": excerpt, "value": match.group(0).strip()}
                 elif valid_orgnr(number) and number != company.org:
                     window = raw_text[max(0, match.start() - 40):match.start()].lower()
                     if re.search(r"org|foretak|mva|vat|reg", window):
@@ -637,13 +640,28 @@ def address_on_page(street: str, postcode: str, text: str) -> str | None:
     if not words:
         return None
     stems = [_street_stem(w) for w in words]
+
+    def complete(span: str) -> bool:
+        span_tokens = tokens(span)
+        return (not numbers or any(n in span_tokens for n in numbers)) and \
+            all(any(t.startswith(stem) for t in span_tokens) for stem in stems)
+
     for match in re.finditer(re.escape(postcode), text):
-        window = text[max(0, match.start() - 120): match.end() + 40]
-        window_tokens = tokens(window)
-        if numbers and not any(n in window_tokens for n in numbers):
+        low = max(0, match.start() - 120)
+        window = text[low: match.end() + 40]
+        if not complete(window):
             continue
-        if all(any(t.startswith(stem) for t in window_tokens) for stem in stems):
-            return window.strip()[-160:] if len(window) > 160 else window.strip()
+        # Publish whole lines on one line, from the line with the street to the line with the postcode ("Minkveien 6
+        # 9512 ALTA"): the cited excerpt is whitespace-normalised, so an address printed over two lines is still found.
+        end = text.find("\n", match.end())
+        end = len(text) if end < 0 else end
+        start = text.rfind("\n", 0, match.start()) + 1
+        while not complete(text[start:end]) and start > low:
+            start = text.rfind("\n", 0, start - 1) + 1
+        span = squash(text[start:end])
+        if complete(span) and len(span) <= 200:
+            return span
+        return squash(window)[-160:]
     return None
 
 
@@ -940,7 +958,8 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     docs = page_documents(site.pages, "company_owned_website")
     home_doc, home = docs[0]
     site_host = host_of(site.home_url)
-    out: dict[str, Any] = {"url": site.home_url, "host": site_host, "profiles": [], "careers": [], "posts": [], "brand": None,
+    home_url = strip_session_ids(site.home_url)  # the fetch record keeps the URL as served; the claim carries no session id
+    out: dict[str, Any] = {"url": home_url, "host": site_host, "profiles": [], "careers": [], "posts": [], "brand": None,
                            "description": None}
     proof_ids = []
     for kind in ("orgnr", "phone", "email", "address"):
@@ -956,7 +975,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
         if claim:
             proof_ids.append(claim["id"])
     # The website claim cites the fetch record of the page that passed the gate (URL, time, hash).
-    home_doc.text = home_doc.text + f"\n[fetched] {site.home_url}"
+    home_doc.text = home_doc.text + f"\n[fetched] {home_url}"
     home_doc._norm_text = None
     field_name = "official_website" if primary else "additional_website"
     shared = shared_site(company, site)
@@ -965,8 +984,8 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
         extra["site_scope"] = "shared_site"
         extra["verification"] = (site.reason + "; the page is on a site that belongs to a group, chain or manager, so only this page "
                                  "is attributed to the company")
-    official = ledger.text_claim(home_doc, f"[fetched] {site.home_url}", "website", field_name, site.home_url, qualifier=site_host,
-                                 display=site.home_url, confidence=site.confidence, method="identity_gate", locator="final_url",
+    official = ledger.text_claim(home_doc, f"[fetched] {home_url}", "website", field_name, home_url, qualifier=site_host,
+                                 display=home_url, confidence=site.confidence, method="identity_gate", locator="final_url",
                                  extra=extra)
     if official:
         out["claim_id"] = official["id"]
@@ -1062,7 +1081,7 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
             own = host.endswith(registrable(site_host))
             if not (is_ats or (own and (career_path(path) or (CAREER_TEXT.match(fold(link.text).strip()) and not re.search(r"/20\d\d/", path))))):
                 continue
-            url = link.url.split("#")[0]
+            url = strip_session_ids(link.url.split("#")[0])
             if url in seen_career or len(seen_career) >= 2:
                 continue
             seen_career.add(url)
@@ -1118,8 +1137,31 @@ def _entry_link(node: Any) -> str:
     return fallback
 
 
+SESSION_KEYS = {"jsessionid", "phpsessid", "sid", "sessionid", "session_id", "cfid", "cftoken"}
+
+
+def _session_key(key: str) -> bool:
+    key = urllib.parse.unquote(key).strip().lower()
+    return key in SESSION_KEYS or key.startswith("aspsessionid")
+
+
+def strip_session_ids(url: str) -> str:
+    """Drop session ids (";jsessionid=..." in the path; "jsessionid", "PHPSESSID", "sid" and the like in the query) from a
+    URL we publish: the server hands out a new one on every visit (vertshusetfrisor.no/c;jsessionid=...timebok?0), so a
+    refresh would report the same page as a changed website. Every other part of the URL is kept exactly as it was."""
+    parts = urllib.parse.urlsplit(url)
+    path = re.sub(r";(?:jsessionid|phpsessid|sessionid|sid)=[^/?#;]*", "", parts.path, flags=re.I)
+    pieces = [piece for piece in parts.query.split("&") if piece]
+    kept = [piece for piece in pieces if not _session_key(piece.split("=", 1)[0])]
+    query = "&".join(kept) if kept != pieces else parts.query
+    if path == parts.path and query == parts.query:
+        return url
+    return urllib.parse.urlunsplit(parts._replace(path=path, query=query))
+
+
 def clean_url(url: str) -> str:
-    """Drop campaign-tracking parameters (utm_*) that feeds append to every link."""
+    """Drop campaign-tracking parameters (utm_*) that feeds append to every link, and session ids."""
+    url = strip_session_ids(url)
     parts = urllib.parse.urlsplit(url)
     if not parts.query:
         return url
