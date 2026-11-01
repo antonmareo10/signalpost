@@ -3,6 +3,17 @@
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
 
+## Version 1.5.1 (1 Nov): a 40-minute default time budget
+
+Builderr's official runs get 45 minutes. The default budget is now 40 minutes instead of 55, and it counts from process
+start (reading the inputs, the optional bulk snapshot and the previous run are part of it), so the envelopes and the
+viewer are written inside the official limit. Nothing else changes from 1.5.0.
+
+Checks on 1 Nov, keyless: the smoke-100 batch with the defaults gives 100/100 envelopes and passes validation in 129 s.
+Cut-off test: dev-300 with `--time-budget-minutes 1.5` ended after 109 s including the viewer, with 300/300 envelopes and
+validation passed; what was not reached says so per section (256 annual-account lists, 106 website sections, and 6
+companies not researched at all, status failed with that reason). 132 offline tests pass.
+
 ## Version 1.5.0 (31 Oct): ask the register whose website it is, before publishing a site we inferred
 
 **How it was found.** 1.4.0 was run on 1,000 companies never used in development (the public universe, seed
@@ -319,7 +330,7 @@ Scale, same 1,000 random companies as below (seed 1000), 22 Oct, keyless, 24 wor
 The copies endpoint sustains less than one request per second (260 calls alone at 2/s still drew 10 refusals), so
 the released default waits at most 300 s for it after the other phases (`SIGNALPOST_COPIES_WAIT_SECONDS`); a company not
 reached in time carries an explicit error and no "no documents" claim. Expected wall clock for 1,000 companies: about
-16 minutes, inside the 55-minute default budget. Other families on that batch: register history 997, English industry
+16 minutes, inside the 55-minute default budget of that release (40 minutes since 1.5.1). Other families on that batch: register history 997, English industry
 label 888 (the rest are registered as "00.000 unspecified"), employee-count history 142, verified websites 102–104
 (the same-day difference is a closed connection and a robots.txt refusal, both reported, not guessed).
 

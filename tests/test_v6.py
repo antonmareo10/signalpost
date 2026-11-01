@@ -287,5 +287,38 @@ class RegisterDateTests(unittest.TestCase):
         self.assertTrue(supports("2025-09-01", '{"dato":"2025-09-02T00:05:37.005+02:00"}'))
         self.assertFalse(supports("2025-09-03", '{"dato":"2025-09-02T00:05:37.005+02:00"}'))
 
+class TimeBudgetTests(unittest.TestCase):
+    """Official runs get 45 minutes: the default budget is 40 and counts from process start (1.5.1)."""
+
+    def test_default_budget_is_40_minutes(self):
+        from signalpost import cli
+        seen = {}
+        with mock.patch.dict("os.environ", {}, clear=False), mock.patch.object(cli, "cmd_run", lambda args: seen.setdefault("args", args) and 0):
+            import os
+            os.environ.pop("SIGNALPOST_TIME_BUDGET_MINUTES", None)
+            cli.main(["run", "--organisations", "orgs.txt"])
+        self.assertEqual(seen["args"].time_budget_minutes, 40.0)
+
+    def test_budget_counts_time_spent_before_the_agent_starts(self):
+        from signalpost import cli
+        captured = {}
+
+        class StopAgent(Exception):
+            pass
+
+        def fake_agent(**kwargs):
+            captured.update(kwargs)
+            raise StopAgent
+
+        clock = iter([1000.0, 1090.0])  # 90 s spent reading inputs, the bulk snapshot and the previous run
+        with mock.patch.object(cli, "Agent", fake_agent), mock.patch.object(cli, "read_inputs", lambda path: ["123456785"]),                 mock.patch.object(cli, "read_bulk", lambda path, orgs: {}), mock.patch.object(cli, "load_previous", lambda path: None),                 mock.patch.object(cli, "latest_history", lambda d, r: None), mock.patch.object(cli.time, "monotonic", lambda: next(clock)):
+            args = mock.Mock(organisations="x", expected_count=None, run_id="r", output="out/envelopes.jsonl", history_dir=None,
+                             previous=None, bulk=None, snapshots=None, cache_dir=None, workers=4, time_budget_minutes=40.0,
+                             no_guess=False, nav_mode="names", no_search=True, max_search=0)
+            with self.assertRaises(StopAgent):
+                cli.cmd_run(args)
+        self.assertEqual(captured["time_budget_s"], 40 * 60 - 90)
+
+
 if __name__ == "__main__":
     unittest.main()

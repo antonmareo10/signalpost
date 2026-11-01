@@ -29,7 +29,8 @@ That one command writes:
 Input may be JSONL (`{"organisation_number": "..."}` per line), a JSON list, or plain text/CSV with one number per line.
 Useful options: `--bulk <brreg snapshot .csv|.jsonl[.gz]>` (identity fallback + registered website),
 `--previous <envelopes.jsonl>` (explicit refresh baseline), `--expected-count N`, `--workers 24`,
-`--time-budget-minutes 55` (also `SIGNALPOST_TIME_BUDGET_MINUTES`), `--run-id`, `--no-site`.
+`--time-budget-minutes 40` (also `SIGNALPOST_TIME_BUDGET_MINUTES`; counted from process start, so a run on the official
+45-minute budget always finishes and writes one envelope per input), `--run-id`, `--no-site`.
 Rebuild the viewer from any envelopes file: `python -m signalpost site --envelopes out/envelopes.jsonl --site out/site`.
 
 Tests (offline): `python -m unittest discover -s tests`.

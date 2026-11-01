@@ -182,7 +182,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     previous = load_previous(previous_path)
     bulk = read_bulk(args.bulk, set(valid))
     agent = Agent(run_id=run_id, snapshot_dir=args.snapshots or str(out.parent / "snapshots"), cache_dir=args.cache_dir,
-                  workers=args.workers, time_budget_s=args.time_budget_minutes * 60, guess_domains=not args.no_guess,
+                  workers=args.workers, time_budget_s=max(60.0, args.time_budget_minutes * 60 - (time.monotonic() - started)),
+                  guess_domains=not args.no_guess,
                   nav_mode=args.nav_mode, use_search=not args.no_search, max_search=args.max_search,
                   log=lambda msg: print(msg, file=sys.stderr, flush=True))
     agent._errors = {}
@@ -240,7 +241,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--site", default=None, help="static viewer directory (default: <output dir>/site)")
     run.add_argument("--no-site", action="store_true")
     run.add_argument("--workers", type=int, default=int(os.environ.get("SIGNALPOST_WORKERS", "24")))
-    run.add_argument("--time-budget-minutes", type=float, default=float(os.environ.get("SIGNALPOST_TIME_BUDGET_MINUTES", "55")))
+    # official runs get 45 minutes; the budget counts from process start, so 40 leaves time to write the envelopes and the viewer
+    run.add_argument("--time-budget-minutes", type=float, default=float(os.environ.get("SIGNALPOST_TIME_BUDGET_MINUTES", "40")))
     run.add_argument("--no-guess", action="store_true", help="disable domain guessing from the legal name")
     run.add_argument("--no-search", action="store_true", help="disable the optional search provider even if a key is set")
     run.add_argument("--max-search", type=int, default=int(os.environ.get("SIGNALPOST_MAX_SEARCH", "400")))

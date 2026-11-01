@@ -58,7 +58,7 @@ class Work:
 
 class Agent:
     def __init__(self, *, run_id: str, snapshot_dir: str | None, cache_dir: str | None, workers: int = 16,
-                 time_budget_s: float = 3000, guess_domains: bool = True, nav_mode: str = "names", use_search: bool = True,
+                 time_budget_s: float = 2400, guess_domains: bool = True, nav_mode: str = "names", use_search: bool = True,
                  search_min_revenue: float = 2_000_000, max_search: int = 400, log=print) -> None:
         self.run_id = run_id
         self.fetcher = Fetcher(snapshot_dir=snapshot_dir)
