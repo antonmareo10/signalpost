@@ -6,6 +6,7 @@ for 1,000 new companies (seed 20261101).
 - A profile handle that spells another organisation in the registered group is that organisation's (VARANGER KRAFT AS
   and its subsidiaries' pages, BAUTA CONSTRUCTION AS and BAUTA GROUP AS's).
 - Facebook's "/p/<Name>-<id>/" pages are read without the id (Brokke-VVS-as-61552198067839 is BROKKE VVS AS).
+- No revenue percentage from a negative filed year ("up 16796.2%" from NOK -11 k to NOK 1.9 m).
 Run: python -m unittest discover -s tests"""
 from __future__ import annotations
 
@@ -20,9 +21,11 @@ sys.path.insert(0, str(ROOT / "tests"))
 from signalpost.agent import Agent  # noqa: E402
 from signalpost.ledger import Ledger  # noqa: E402
 from signalpost.registry import group_claims  # noqa: E402
+from signalpost.synth import _pct_change, check_sentence  # noqa: E402
 from signalpost.web import Candidate, Company, SiteResearcher, extract_site, foreign_entity_handle, shared_site  # noqa: E402
 from test_v2 import fetched  # noqa: E402
 from test_v4 import FakeFetcher, result, site  # noqa: E402
+from test_v5 import OverviewTests, year  # noqa: E402
 
 
 def research(company: Company, url: str, html: str, source: str = "registry_website", strength: str = "strong"):
@@ -151,6 +154,29 @@ class FacebookIdSlugTests(unittest.TestCase):
         self.assertFalse(foreign_entity_handle(jerstad, "https://www.facebook.com/Jerstad-Vvs-Rørlegger-Bedrift-1809952822585712/"))
         hegra = Company(org="937903235", name="HEGRA SPAREBANK")
         self.assertFalse(foreign_entity_handle(hegra, "https://www.facebook.com/pages/Hegra-Sparebank/137392483810"))
+
+
+class NegativeBaseRevenueTests(OverviewTests):
+    def test_no_percentage_from_a_negative_year(self):
+        # 914842441 in the 1 Nov batch: revenue NOK -11,087 in 2024 and NOK 1,851,104 in 2025 read "up 16796.2%".
+        ledger, s = self.summary([year(2025, 1_851_104, 1_800_000, 17_200_000, 18_000_000),
+                                  year(2024, -11_087, -50_000, 15_400_000, 16_000_000)])
+        self.assertNotIn("%", " ".join(s["parts"]["overview"]))
+        self.assertIn("In 2025 it had revenue of NOK 1.9 m, made an operating profit of NOK 1.8 m and had equity of NOK 17.2 m.",
+                      s["parts"]["overview"])
+        self.assertNotIn("16796", s["text"])
+        self.assertIn("revenue went from NOK -11 k to NOK 1.9 m", " ".join(s["parts"]["what_changed"]))
+        self.assertFalse([sig for sig in s["signals"] if sig["text"].startswith("Revenue ")])
+        self.assertEqual(s["dropped_unsupported_sentences"], 0)
+        self.assertTrue(all(check_sentence(sentence, ledger) for sentence in s["sentences"]))
+
+    def test_the_percentage_needs_two_positive_years(self):
+        rows = lambda a, b: ({"revenue": {"value": a}}, {"revenue": {"value": b}})  # noqa: E731
+        self.assertEqual(_pct_change(*rows(1_200_000, 1_000_000), "revenue"), 20.0)
+        self.assertEqual(_pct_change(*rows(0, 1_000_000), "revenue"), -100.0)
+        self.assertIsNone(_pct_change(*rows(1_851_104, -11_087), "revenue"))
+        self.assertIsNone(_pct_change(*rows(-50_000, 100_000), "revenue"))
+        self.assertIsNone(_pct_change(*rows(100_000, 0), "revenue"))
 
 
 if __name__ == "__main__":

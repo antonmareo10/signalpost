@@ -652,6 +652,11 @@ def _accounts_change(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         bits.append(text)
         derived["revenue_change_pct"] = change
         ids += [latest["revenue"]["claim_id"], previous["revenue"]["claim_id"]]
+    elif "revenue" in latest and "revenue" in previous and latest["revenue"]["value"] != previous["revenue"]["value"]:
+        # no meaningful percentage (a negative year on either side): state the two filed amounts
+        before, after = nok_pair(previous["revenue"]["value"], latest["revenue"]["value"])
+        bits.append(f"revenue went from {before} to {after}")
+        ids += [latest["revenue"]["claim_id"], previous["revenue"]["claim_id"]]
     if "operating_result" in latest and "operating_result" in previous:
         a, b = previous["operating_result"]["value"], latest["operating_result"]["value"]
         if a == b:
@@ -687,7 +692,12 @@ def _flat_word(latest: dict[str, Any], previous: dict[str, Any], field: str) -> 
 
 
 def _pct_change(latest: dict[str, Any], previous: dict[str, Any] | None, field: str) -> float | None:
+    """Year-on-year change in percent, only between two positive (or zero, for the latest year) filed values: a change
+    measured from a negative base ("up 16796.2%" from NOK -11 k to NOK 1.9 m) or into a negative value is not a growth
+    rate anyone can use, so the amounts are stated instead."""
     if not previous or field not in latest or field not in previous or not previous[field]["value"]:
+        return None
+    if previous[field]["value"] < 0 or latest[field]["value"] < 0:
         return None
     return round((latest[field]["value"] - previous[field]["value"]) / abs(previous[field]["value"]) * 100, 1)
 
