@@ -1,7 +1,77 @@
-# Evaluation (local, 21–31 Oct 2026)
+# Evaluation (local, 21 Oct – 1 Nov 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.6.0 (1 Nov): nothing from another organisation's site, profile or group under the company
+
+**How it was found.** 1.5.1 was run on 1,000 companies never used before (the public universe, seed 20261101, sampled
+the starter kit's way after removing the 2,596 companies of the seed-1000 and seed-20261031 batches and of the smoke,
+dev, validation and Builderr samples), keyless and with the defaults: 1,000 / 1,000 envelopes, validation passed,
+929 s, 8,875 requests. Every published item was read by hand: 131 websites (130 companies, one additional site), 133
+social profiles (68 companies), 24 careers pages (21), 8 NAV ads (4) and 228 posts (32), with the register's website
+field for every published domain (`hjemmeside` search), the organisation numbers printed on the stored pages and the
+group structure. No website belonged to another organisation. 23 items published from correct websites did:
+
+| Company | What 1.5.1 published | Whose it is |
+|---|---|---|
+| BLÅ KORS BARNEHAGE ØVREBØ AS (930574643) | from its registered page blakors.no/barnehage-ovrebo/, which prints its number: blakors.no's Facebook, Instagram, LinkedIn and YouTube, careers page and 10 news posts | Blå Kors Norge (962323855) |
+| VARANGER KRAFT AS (985188092) | facebook and instagram `varangerkraftmarked`, facebook and youtube `varangerkraftfiber` | its subsidiaries VARANGER KRAFTMARKED AS and VARANGER KRAFTFIBER AS |
+| BAUTA CONSTRUCTION AS (956595924) | linkedin and instagram `bautagroup` | BAUTA GROUP AS, its ultimate parent |
+| BROKKE ALPINSENTER AS (916538227) | facebook.com/p/Brokke-VVS-as-61552198067839 | BROKKE VVS AS (932149664) |
+| BENTERUDJORDET BORETTSLAG (948616858) | brand "Vibbo - En tjeneste fra OBOS" from vibbo.no/benterudjordet/om | OBOS's housing platform |
+
+**The fixes.** (1) A page under a path of a domain that is not named after the company is published as that page only
+(`site_scope: shared_site`), even when it prints the company's organisation number: the number shows the page is
+about the company, not that the site's brand, profiles, careers page and posts are its own. (2) A profile handle that
+spells the name of another organisation in the company's registered group (parent, ultimate parent or subsidiary, from
+the register's group structure) is that organisation's, unless the name is part of the company's own. (3) Facebook's
+`/p/<Name>-<id>/` pages are read without the numeric id, so a name ending in another company's legal form is caught
+like any other foreign-entity handle.
+
+**What it costs.** The same 1,000 companies with the three rules, keyless, on 1 Nov: 1,000 / 1,000, validation passed,
+1,020 s, 8,873 requests, 96,282 / 96,282 excerpts re-found. Websites lost to the rules: 0. Removed: the 23 items above
+(11 profiles, 1 careers page, 10 posts, 1 brand). Lost: 4 correct items, the kindergarten's brand and description, the
+housing co-operative's description and the description of MILANO PIZZA GRILL AS's ordering page on
+pckassenettbutikk.no. Everything else that differed between the two runs was the network (scandec.no answered 429).
+On the seed-1000 and seed-20261031 batches the rules change two companies: REKOM DRIFT KRISTIANSAND AS on
+sedetpianobar.no/kristiansand loses the SE DET! chain's two profiles and, with them, the venue's brand and description;
+GFH.NO AS's page on gfh.no/geosport/ only changes scope.
+
+**Money.** In 30 random envelopes with accounts, all 1,490 accounts claims equal the live Regnskapsregisteret value at
+the cited JSON pointer and the stored copy (same year, account type and currency). Recomputing the 2,757 derived
+figures in the 1,000 summaries found 8 that were revenue percentages measured from a negative year, in 4 companies
+(HTEK AS: "up 16796.2%" from NOK -11 k to NOK 1.9 m, also the signal "Revenue grew 16796.2%"). 1.6.0 gives no
+percentage and no revenue signal when either year is negative; "What changed" states the two amounts ("revenue went
+from NOK -11 k to NOK 1.9 m"). In the 1,000 summaries of the run above, 0 of 2,049 revenue percentages involve a
+negative year and 0 sentences were dropped.
+
+**Three smaller fixes from the same reading**, measured by running 1.5.1 and 1.6.0 back to back on the 370 companies
+with a published website in the three batches (1.5.1: 421 s, 4,916 requests; 1.6.0: 408 s, 4,901 requests; both
+validation passed):
+- The domain of the registered e-mail address, published from the register listing when its site refuses the crawler,
+  now goes through the same `hjemmeside` check as every other inferred site (another organisation lists it: `related`,
+  nothing published; no answer: not checked, earlier values kept). The three such listings in the three batches
+  (sommerlyst.no, albertvoldinterior.no, tungror.no) are listed for no other organisation and stay published; the check
+  costs two register requests per listing.
+- Published website and careers URLs carry no session id: vertshusetfrisor.no/c;jsessionid=…timebok?0 changed on every
+  run and is now vertshusetfrisor.no/c?0 (the fetch record keeps the URL as served).
+- The identity proof is cited when the registered address is printed over two lines (it was never found as an excerpt)
+  or the organisation number is the last line of the page (its excerpt ran into the page's meta tags). Sites with a
+  verified website but no cited proof: 136 of 362 in 1.5.1, 60 in 1.6.0 (1 Nov batch 44 → 12, seed 1000 47 → 25,
+  seed 20261031 45 → 23); 212 address proofs and 34 more organisation-number proofs are now cited. Of the remaining 60,
+  59 were verified by the legal name, the domain or the register listing (stated in the website claim), and for one
+  (STRATAGENTIC AS) the excerpt around its number does not pass the claim check, so the proof is left out rather than
+  cited loosely.
+- Differences between the two A/B runs other than these and the rules above: REGN AS (regnstore.no) was refused with
+  HTTP 429 in the 1.5.1 run and verified in the 1.6.0 run.
+
+Smoke test (`samples/smoke-100.jsonl`, three passes with the release code, 1 Nov, committed in `docs/smoke/`): 100/100
+envelopes, validation passed on every pass, 120–122 s per pass, third pass 0 changes and 0 carried-forward claims,
+evidence audit 9,394 / 9,394 excerpts re-found, 100/100 summaries with an overview, 1,463 / 1,463 sentences that cite
+claims carry their sources, 0 dropped. Verified websites 9, as in 1.5.0. The scripted browser check (24 steps, 1440 px
+and 390 px) passes on the committed smoke viewer and axe-core 4.14 reports 0 violations on all 10 views. 165 offline
+unit tests (132 in 1.5.1). The default time budget stays 40 minutes from process start.
 
 ## Version 1.5.1 (1 Nov): a 40-minute default time budget
 
