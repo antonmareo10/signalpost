@@ -157,16 +157,25 @@ industry code, contact details, roles).
    legal person). On a fresh 1,000-company batch this caught a holding company that had been given its renamed sister
    company's website, a company sharing a municipal enterprise's e-mail domain, an owners' association given a
    construction company's project site and a group company given the group's site (see EVAL.md). If the register does
-   not answer, the site is reported as not checked rather than published.
+   not answer, the site is reported as not checked rather than published. Since 1.6.0 the same check also runs before
+   the domain of the registered e-mail address is published from the register listing because its site refuses
+   automated access (another organisation lists it: `related`; no answer: not checked). The identity proof the gate
+   found is cited as an excerpt of the page (since 1.6.0 also an address printed over two lines, and an organisation
+   number at the very end of a page).
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
    when single), parent-group handles (`-gruppen-as`, `-ag`) and owners' personal pages are excluded (since 1.5.0 also a
-   handle that spells a registered role holder's first and last name, unless the company is named after that person),
+   handle that spells a registered role holder's first and last name, unless the company is named after that person;
+   since 1.6.0 also a handle that spells the name of another organisation in the company's registered group, such as a
+   subsidiary's or the ultimate parent's page, and a Facebook `/p/<Name>-<id>/` page whose name is another company's),
    and a profile linked
    from several companies' sites in one batch (web-agency footers) is dropped. Since 1.3.0, when the verified page sits on
    someone else's site (a chain's dealer page, a group's or a manager's site: the page is a sub-page, or the site prints
    another organisation number, or its domain carries none of the company's current names, and the site does not print
    this company's organisation number), only the page itself is published, labelled `site_scope: shared_site`; the
    brand, description, profiles, careers page and posts on that site belong to the chain, the group or the manager.
+   Since 1.6.0 a page under a path of a domain that is not named after the company is such a page even when it prints
+   the company's organisation number: the number shows that the page is about the company, not that the site is its own
+   (blakors.no/barnehage-ovrebo/ is a kindergarten's page; blakors.no's profiles, careers page and news are Blå Kors Norge's).
 5. **Jobs** – NAV's public job-vacancy feed (public token, republishing permitted by NAV's API terms). An ad is attributed
    only when `employer.orgnr` is the company or one of its registered workplaces. Contact persons are never stored.
    Ads are looked up by the names of the company and its workplaces, without store numbers ("NARVESEN BUTIKKEN 600"
@@ -190,7 +199,8 @@ The summary is generated from verified claims only (no language model, nothing t
 sentence lists the claim ids it rests on and the numbers of its sources, and `check_sentence` rejects any sentence
 containing a number that is not a cited value or a declared computation (revenue change, operating margin, equity
 ratio, counts). Ratios that would mislead (a margin beyond ±300 % on tiny revenue, an equity ratio when negative equity
-exceeds total assets) are left out. The summary opens with an overview and then has five parts that answer the brief:
+exceeds total assets, and since 1.6.0 a revenue change measured from or into a negative year, where the two filed
+amounts are stated instead) are left out. The summary opens with an overview and then has five parts that answer the brief:
 
 - **In brief** (`summary.overview`) – three to five sentences: what the company is (form, place, English industry label,
   founding year, registered employees), how the latest filed accounts look (revenue and its change, and whether it has
@@ -225,7 +235,9 @@ timestamp in UTC or in Oslo time depending on the server, so event dates are tak
 (not its first ten characters); and a candidate website that answers HTTP 429 ("too many requests") makes the website
 section `blocked` for that run, so a site verified before is carried forward rather than reported as removed (a 429
 with `Retry-After` of 10 s or less is retried twice; Shopify storefronts answer `Retry-After: 60` to crawlers and are
-not retried early). Every run's envelopes are preserved in `history/`.
+not retried early). Since 1.6.0 published website and careers-page URLs carry no session id (`;jsessionid=…`,
+`PHPSESSID`, `sid` and the like), which a server hands out anew on every visit; the fetch record keeps the URL as
+served. Every run's envelopes are preserved in `history/`.
 
 ## Sources, rights and safety
 

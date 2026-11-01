@@ -1,4 +1,4 @@
-"""Offline tests for the v7 work: cases from reading every website, profile, careers page and post that 1.5.1 published
+"""Offline tests for 1.6.0: cases from reading every website, profile, careers page and post that 1.5.1 published
 for 1,000 new companies (seed 20261101).
 
 - A page under a path of someone else's domain stays that page only, even when it prints the company's organisation
