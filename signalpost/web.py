@@ -224,6 +224,7 @@ class Company:
     employees: int | None = None
     revenue: float | None = None
     industry: str = ""
+    group_names: list[str] = field(default_factory=list)  # parent, ultimate parent and subsidiaries in the register
 
     @property
     def core(self) -> list[str]:
@@ -801,9 +802,24 @@ def acceptable_brand(brand: str, company: Company, site_host: str) -> bool:
 
 
 def foreign_entity_handle(company: Company, url: str) -> bool:
-    """Handles such as 'wyssen-avalanche-control-ag' or 'lindbak-gruppen-as' name another legal entity (parent/group)."""
-    segment = urllib.parse.unquote(urllib.parse.urlsplit(url).path).strip("/").split("/")[-1]
+    """Handles such as 'wyssen-avalanche-control-ag' or 'lindbak-gruppen-as' name another legal entity (parent/group).
+
+    So does a handle that spells the whole name of another organisation in the company's registered group: VARANGER
+    KRAFT AS links its subsidiaries' pages (facebook.com/varangerkraftmarked is VARANGER KRAFTMARKED AS), and BAUTA
+    CONSTRUCTION AS links its ultimate parent's (linkedin.com/company/bautagroup is BAUTA GROUP AS). A member name that
+    is part of the company's own name ("varangerkraft" on VARANGER KRAFTMARKED AS's site) is not enough to drop it."""
+    path = urllib.parse.unquote(urllib.parse.urlsplit(url).path)
+    compact = domain_key(path)
+    own_keys = [domain_key("".join(name_tokens(n))) for n in [company.name, *company.aliases, *company.brands] if name_tokens(n)]
+    for member in company.group_names:
+        key = domain_key("".join(name_tokens(member)))
+        if len(key) >= 5 and key in compact and not any(key in own for own in own_keys):
+            return True
+    segment = path.strip("/").split("/")[-1]
     parts = [p for p in re.split(r"[-_.]+", fold(segment)) if p]
+    if len(parts) > 2 and parts[-1].isdigit():
+        # Facebook's "/p/<Name>-<id>/" pages end in a numeric id: "Brokke-VVS-as-61552198067839" is BROKKE VVS AS's page.
+        parts = parts[:-1]
     if len(parts) < 2:
         return False
     if parts[-1] in FOREIGN_FORMS - {"as", "asa"}:
@@ -880,14 +896,20 @@ def shared_site(company: Company, site: SiteResult) -> bool:
     """A verified page that sits on someone else's site: a franchise chain's store page (systemhus.no/forhandlere/...),
     a kindergarten chain's page, or a group/manager site that prints another organisation number. The page names the
     company, but the site's brand, profiles, feed and careers page belong to the chain, the group or the manager.
-    A site that prints this company's organisation number, or whose domain is named after it, is the company's own."""
-    if site.proof.get("orgnr"):
-        return False
+    A site whose domain is named after the company is the company's own, and so is the home page of a site that prints
+    this company's organisation number. A page under a path of a domain not named after the company stays a page on
+    someone else's site even when it prints the number: blakors.no/barnehage-ovrebo/ prints BLÅ KORS BARNEHAGE ØVREBØ
+    AS's number, but blakors.no's profiles, careers page and news are Blå Kors Norge's, and vibbo.no/benterudjordet/om's
+    site name is OBOS's platform, not the housing co-operative's brand."""
     host = host_of(site.home_url)
     if domain_match(company, host)[1]:
         return False
     segments = [s for s in urllib.parse.urlsplit(site.home_url).path.lower().split("/") if s and s not in LANG_SEGMENTS]
-    return bool(segments) or bool(site.proof.get("other_orgnrs")) or not name_overlap(company, host)
+    if segments:
+        return True
+    if site.proof.get("orgnr"):
+        return False
+    return bool(site.proof.get("other_orgnrs")) or not name_overlap(company, host)
 
 
 def name_overlap(company: Company, host: str) -> bool:

@@ -151,7 +151,8 @@ class Agent:
                                brands=self._subunit_brands(name, work.subunits),
                                people=[p["name"] for p in work.people if p.get("name")],
                                employees=entity.get("antallAnsatte"), revenue=revenue,
-                               industry=(entity.get("naeringskode1") or {}).get("kode", ""))
+                               industry=(entity.get("naeringskode1") or {}).get("kode", ""),
+                               group_names=self._group_names(ledger, org))
 
     # -- phase C: website and footprint -------------------------------------------------------------
     def candidates(self, work: Work) -> list[Candidate]:
@@ -206,6 +207,14 @@ class Agent:
                 elif resolve("www." + host):  # only the www name exists in DNS: start there
                     add("https://www." + host, "domain_guess_from_legal_name", "weak", note)
         return out
+
+    @staticmethod
+    def _group_names(ledger: Ledger, org: str) -> list[str]:
+        """Names of the other organisations in the company's registered group (parent, ultimate parent, subsidiaries):
+        a profile handle that spells one of them is that organisation's, not this company's."""
+        return [str(c["value"]["name"]) for c in ledger.claims
+                if c["field"] in ("group_parent", "group_ultimate_parent", "group_subsidiary") and isinstance(c["value"], dict)
+                and c["value"].get("name") and c["value"].get("organisation_number") != org]
 
     @staticmethod
     def _subunit_brands(legal_name: str, subunits: list[dict[str, Any]]) -> list[str]:
