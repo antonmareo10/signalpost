@@ -176,6 +176,14 @@ industry code, contact details, roles).
    Since 1.6.0 a page under a path of a domain that is not named after the company is such a page even when it prints
    the company's organisation number: the number shows that the page is about the company, not that the site is its own
    (blakors.no/barnehage-ovrebo/ is a kindergarten's page; blakors.no's profiles, careers page and news are Blå Kors Norge's).
+   Since 1.6.1 two more kinds of site lend only the page. One is a registered website that does not print the company's
+   number and whose domain spells the whole name of another organisation that lists the same website in the register,
+   but only part of the company's name (gaute-rostrup.no, listed by the property company GAUTE ROSTRUP EIENDOM AS, is the
+   frame shop GAUTE ROSTRUP AS's site). If the register does not answer, the page alone is published too. The other is a
+   site whose domain is named after the company's registered parent or ultimate parent and not after the company
+   (boreal.no for BOREAL BANE AS is the Boreal group's). Also since 1.6.1, no e-mail address is taken from a sub-page that
+   links addresses on three or more domains (a group's list of offices), and a site name with a part that names another
+   legal entity ("Langset AS - Forside" for LANGSET GROUP AS) is not published as the brand.
 5. **Jobs** – NAV's public job-vacancy feed (public token, republishing permitted by NAV's API terms). An ad is attributed
    only when `employer.orgnr` is the company or one of its registered workplaces. Contact persons are never stored.
    Ads are looked up by the names of the company and its workplaces, without store numbers ("NARVESEN BUTIKKEN 600"

@@ -1,4 +1,4 @@
-"""Offline tests for fix-1102: cases from reading every website, profile, careers page, post, brand, description and
+"""Offline tests for 1.6.1: cases from reading every website, profile, careers page, post, brand, description and
 e-mail address that 1.6.0 published for 1,000 new companies (seed 20261102), and the same rules measured on the
 earlier batches.
 
