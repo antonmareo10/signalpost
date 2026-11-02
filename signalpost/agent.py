@@ -153,7 +153,8 @@ class Agent:
                                people=[p["name"] for p in work.people if p.get("name")],
                                employees=entity.get("antallAnsatte"), revenue=revenue,
                                industry=(entity.get("naeringskode1") or {}).get("kode", ""),
-                               group_names=self._group_names(ledger, org))
+                               group_names=self._group_names(ledger, org),
+                               parent_names=self._group_names(ledger, org, ("group_parent", "group_ultimate_parent")))
 
     # -- phase C: website and footprint -------------------------------------------------------------
     def candidates(self, work: Work) -> list[Candidate]:
@@ -210,11 +211,13 @@ class Agent:
         return out
 
     @staticmethod
-    def _group_names(ledger: Ledger, org: str) -> list[str]:
+    def _group_names(ledger: Ledger, org: str,
+                     fields: tuple[str, ...] = ("group_parent", "group_ultimate_parent", "group_subsidiary")) -> list[str]:
         """Names of the other organisations in the company's registered group (parent, ultimate parent, subsidiaries):
-        a profile handle that spells one of them is that organisation's, not this company's."""
+        a profile handle that spells one of them is that organisation's, not this company's. With only the parent
+        fields: the domains named after one of them are the group's site, not this company's."""
         return [str(c["value"]["name"]) for c in ledger.claims
-                if c["field"] in ("group_parent", "group_ultimate_parent", "group_subsidiary") and isinstance(c["value"], dict)
+                if c["field"] in fields and isinstance(c["value"], dict)
                 and c["value"].get("name") and c["value"].get("organisation_number") != org]
 
     @staticmethod

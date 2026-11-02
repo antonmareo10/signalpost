@@ -225,6 +225,7 @@ class Company:
     revenue: float | None = None
     industry: str = ""
     group_names: list[str] = field(default_factory=list)  # parent, ultimate parent and subsidiaries in the register
+    parent_names: list[str] = field(default_factory=list)  # parent and ultimate parent in the register
 
     @property
     def core(self) -> list[str]:
@@ -384,8 +385,25 @@ class SiteResearcher:
             elif owners:
                 decision, confidence, reason = ("related", 0.5, "the register lists this website for another organisation "
                                                                 f"({', '.join(o['org'] for o in owners[:2])})")
+        if decision == "verified" and candidate.strength == "strong" and not proof["orgnr"] \
+                and not domain_match(company, final_host)[0]:
+            # The register can list one website for several organisations, and the company itself may list a sister's
+            # site: GAUTE ROSTRUP EIENDOM AS (property) lists gaute-rostrup.no, the frame shop GAUTE ROSTRUP AS's site.
+            # When the domain spells the whole name of another organisation that lists it, and only part of this
+            # company's name, the site is that organisation's: only the page is attributed (see shared_site). If the
+            # register does not answer, the same holds: the page, never the brand, profiles or posts, unchecked.
+            proof["site_of"] = self._site_of_other(company, final_host,
+                                                   {registrable(final_host), registrable(host_of(candidate.url))})
         return SiteResult(candidate, decision, reason, home_url=result.final_url or candidate.url, pages=pages, proof=proof,
                           confidence=confidence)
+
+    def _site_of_other(self, company: Company, host: str, domains: set[str]) -> list[dict[str, str]] | None:
+        """Other organisations that list one of ``domains`` in the register and whose whole name the domain spells
+        (gaute-rostrup.no for GAUTE ROSTRUP AS). None when the register did not answer."""
+        owners = self._registered_owners(company, domains)
+        if owners is None:
+            return None
+        return [o for o in owners if o.get("name") and domain_match(Company(org=o["org"], name=o["name"]), host)[0]]
 
     def _registered_owners(self, company: Company, domains: set[str]) -> list[dict[str, str]] | None:
         """Other registered entities (not this company or its own workplaces) whose registered website is on one of
@@ -414,7 +432,7 @@ class SiteResearcher:
             owners += [o for o in cached if company.org not in (o["org"], o["parent"])
                        and not (company.legal_form == "NUF" and o["form"] == "UTLA" and set(name_tokens(o["name"])) == set(company.core))]
         unique = {o["parent"] or o["org"]: o for o in owners}
-        return [{"org": org} for org in unique]
+        return [{"org": org, "name": owner["name"]} for org, owner in unique.items()]
 
     def _priority_links(self, page: Page, host: str) -> list[str]:
         seen: set[str] = set()
@@ -808,9 +826,11 @@ def acceptable_brand(brand: str, company: Company, site_host: str) -> bool:
     if not (2 <= len(text) <= 40) or folded == fold(company.name) or re.search(r"(www\.|https?:|\.(no|com|net|org)\b|scroll|meny|menu|cookie)",
                                                                              folded):
         return False
-    toks = tokens(text)
-    if toks and toks[-1] in {"as", "asa", "sa", "da", "ans", "ag", "gmbh", "ab", "ltd", "inc"} and toks != tokens(company.name):
-        return False
+    # Every part of a site name counts: "Langset AS - Forside" names LANGSET AS, not LANGSET GROUP AS.
+    for piece in [text] + re.split(r"\s[|\-–—:·]\s", text):
+        toks = tokens(piece)
+        if toks and toks[-1] in {"as", "asa", "sa", "da", "ans", "ag", "gmbh", "ab", "ltd", "inc"} and toks != tokens(company.name):
+            return False
     brand_tokens = set(tokens(text))
     if any(brand_tokens and brand_tokens <= set(tokens(person)) for person in company.people):
         return False  # a registered person's name (e.g. the owner) is not a company brand
@@ -918,16 +938,31 @@ def shared_site(company: Company, site: SiteResult) -> bool:
     this company's organisation number. A page under a path of a domain not named after the company stays a page on
     someone else's site even when it prints the number: blakors.no/barnehage-ovrebo/ prints BLÅ KORS BARNEHAGE ØVREBØ
     AS's number, but blakors.no's profiles, careers page and news are Blå Kors Norge's, and vibbo.no/benterudjordet/om's
-    site name is OBOS's platform, not the housing co-operative's brand."""
+    site name is OBOS's platform, not the housing co-operative's brand.
+    So is a registered website whose domain spells the whole name of another organisation that lists it in the register
+    (gaute-rostrup.no for GAUTE ROSTRUP EIENDOM AS is the shop GAUTE ROSTRUP AS's), and one named after the company's
+    registered parent and not after the company (boreal.no for BOREAL BANE AS is the Boreal group's)."""
     host = host_of(site.home_url)
+    site_of = site.proof.get("site_of", [])
+    if site_of is None or site_of:
+        return True  # another organisation's site by the register (or the register could not be asked): see research()
     if domain_match(company, host)[1]:
         return False
+    if parent_domain(company, host):
+        return True
     segments = [s for s in urllib.parse.urlsplit(site.home_url).path.lower().split("/") if s and s not in LANG_SEGMENTS]
     if segments:
         return True
     if site.proof.get("orgnr"):
         return False
     return bool(site.proof.get("other_orgnrs")) or not name_overlap(company, host)
+
+
+def parent_domain(company: Company, host: str) -> bool:
+    """The domain is named after the company's registered parent or ultimate parent and not after the company: it is the
+    group's site. boreal.no is BOREAL NORGE AS's (the group), not BOREAL BANE AS's; backe.no is the Backe group's, not
+    BACKE ROGALAND AS's. A subsidiary's own name on its own domain (bautaconstruction.no) is unaffected."""
+    return any(domain_match(Company(org="", name=parent), host)[1] for parent in company.parent_names if name_tokens(parent))
 
 
 def name_overlap(company: Company, host: str) -> bool:
@@ -982,8 +1017,16 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
     extra = {"discovery": site.candidate.source, "verification": site.reason, "proof_claim_ids": proof_ids}
     if shared:
         extra["site_scope"] = "shared_site"
-        extra["verification"] = (site.reason + "; the page is on a site that belongs to a group, chain or manager, so only this page "
-                                 "is attributed to the company")
+        site_of = site.proof.get("site_of", [])
+        if site_of:
+            whose = (f"; the register also lists this website for {', '.join(o['name'] + ' (' + o['org'] + ')' for o in site_of[:2])}, "
+                     "whose name the domain carries, so only this page is attributed to the company")
+        elif site_of is None:
+            whose = ("; the register's website lookup did not answer, so whose site this is could not be checked and only this "
+                     "page is attributed to the company")
+        else:
+            whose = "; the page is on a site that belongs to a group, chain or manager, so only this page is attributed to the company"
+        extra["verification"] = site.reason + whose
     official = ledger.text_claim(home_doc, f"[fetched] {home_url}", "website", field_name, home_url, qualifier=site_host,
                                  display=home_url, confidence=site.confidence, method="identity_gate", locator="final_url",
                                  extra=extra)
@@ -1092,7 +1135,9 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
                 out["careers"].append({"url": url, "claim_id": claim["id"], "portal": host if is_ats else None})
     # contact details published on the site itself
     emails_seen: set[str] = set()
-    for doc, page in docs:
+    for index, (doc, page) in enumerate(docs):
+        if index and directory_page(page):
+            continue  # a list of offices, members or partners: its addresses are theirs (Pantaenius's "Avdelinger" page)
         for link in page.links:
             if link.url.lower().startswith("mailto:"):
                 email = urllib.parse.unquote(link.url[7:].split("?")[0]).strip().lower()
@@ -1106,6 +1151,19 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
                     ledger.text_claim(doc, f"[link] {link.url} {link.text}".strip(), "website", "website_email", email,
                                       confidence=0.9, method="verified_site_mailto")
     return out
+
+
+def directory_page(page: Page) -> bool:
+    """A page that links e-mail addresses on three or more different domains lists other organisations' contacts: a
+    group's offices (pantaenius.com's "Avdelinger" page: Hamburg, Monaco, Skive...), a centre's tenants, partners. The
+    generic addresses on it are those organisations', so none is taken from it (the home page is read as usual)."""
+    domains = set()
+    for link in page.links:
+        if link.url.lower().startswith("mailto:"):
+            address = urllib.parse.unquote(link.url[7:].split("?")[0]).strip().lower()
+            if EMAIL_RE.fullmatch(address):
+                domains.add(address.split("@")[1])
+    return len(domains) >= 3
 
 
 def is_wordpress(site: SiteResult) -> bool:
