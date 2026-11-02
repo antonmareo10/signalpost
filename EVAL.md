@@ -1,7 +1,57 @@
-# Evaluation (local, 21 Oct – 1 Nov 2026)
+# Evaluation (local, 21 Oct – 2 Nov 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.6.1 (2 Nov): a sister's or parent's site lends only the page
+
+**How it was found.** 1.6.0 was run on another 1,000 companies never used before (the public universe, seed 20261102,
+sampled the starter kit's way after removing the 3,596 companies of the seed-1000, seed-20261031 and seed-20261101
+batches and of the smoke, dev, validation and Builderr samples; 0 overlap with each), from a clean checkout of 675d461,
+keyless and with the defaults: 1,000 / 1,000 envelopes, validation passed, 964 s, 8,550 requests, 95,128 / 95,128
+excerpts re-found. It published 137 websites (6 as a page on someone else's site), 135 social profiles (73 companies),
+14 careers pages (13), 4 NAV ads (3), 183 posts (26), 72 brands, 94 descriptions, 62 site e-mail addresses (60) and 204
+identity proofs (105). All 138 companies with anything external were read by hand against the register (website field,
+roles, group structure) and the stored pages. No website belonged to another organisation. 15 items did:
+
+| Company | What 1.6.0 published | Whose it is |
+|---|---|---|
+| GAUTE ROSTRUP EIENDOM AS (984399804), property | from gaute-rostrup.no, which the register lists for it, for the frame shop and for a gallery: the description "Gaute Rostrup AS er en spesial forretning for innramming…", instagram `gauterostrup`, post@gaute-rostrup.no and 10 posts of shop offers | the frame shop GAUTE ROSTRUP AS (945070781), its sister at the same address |
+| PANTAENIUS NUF (914332516) | info@pantaenius.com and info@monaco.pantaenius.com, from the site's "Avdelinger" page listing the group's offices | Pantaenius GmbH (Hamburg) and the Monaco office |
+
+1.5.1 (9e0489d) run right after on the same batch published the same websites, profiles, careers pages, posts,
+descriptions and e-mail addresses; the only difference in those families was the brand "Vibbo - En tjeneste fra OBOS"
+of a housing co-operative, which 1.6.0 rightly drops. 1.6.0 cites 204 identity proofs (128 in 1.5.1) and gives no
+revenue percentage from a negative year (6 in 1.5.1).
+
+**The fixes.** (1) A registered website that does not print the company's organisation number, whose domain spells the
+whole name of another organisation that lists the same website in the register and only part of the company's name, is
+that organisation's site: only the page is attributed (`site_scope: shared_site`). If the register does not answer,
+the page alone is published as well. About 26 register requests per 1,000 companies. (2) A site whose domain is named
+after the company's registered parent or ultimate parent and not after the company is the group's site: only the page.
+(3) No e-mail address is taken from a sub-page that links addresses on three or more domains (a group's list of offices,
+a centre's tenants). (4) A site name with a part that names another legal entity ("Langset AS - Forside" for LANGSET
+GROUP AS, whose sister LANGSET AS shares its address) is not published as the brand.
+
+**What it costs.** 1.6.0 and 1.6.1 back to back, keyless, on the companies with a website or a blocked, failed or
+ambiguous one: on the 2 Nov batch (181 companies, 313 s each, validation passed, 20,543 / 20,543 excerpts re-found) the
+fixes remove the 15 items above and the Langset brand, and lose nothing correct (the other two differences were the
+network: one site down, one answering HTTP 429 to the first run). On the 1 Nov batch (195 companies, 22,365 / 22,365
+excerpts) they remove 4 items of the Boreal group that 1.6.0 hung on BOREAL BANE AS (brand "Boreal", the group's
+description, careers page and one post; boreal.no stays as a page) and lose nothing correct. On the seed-1000 and
+seed-20261031 batches, checked without a rerun, they change one company: BACKE ROGALAND AS on backe.no loses the Backe
+group's Facebook and LinkedIn pages, two careers pages, brand, description and two e-mail addresses.
+
+**Money.** In 30 random envelopes of the 2 Nov batch, all 1,418 accounts claims equal the live Regnskapsregisteret
+value; recomputing the 3,432 derived figures found 0 errors. NAV: 4 / 4 ads carry the company's or one of its
+workplaces' organisation number.
+
+Smoke test (`samples/smoke-100.jsonl`, three passes with the release code, 2 Nov, committed in `docs/smoke/`): 100/100
+envelopes, validation passed on every pass, 118–123 s per pass, third pass 0 changes and 0 carried-forward claims,
+evidence audit 9,394 / 9,394 excerpts re-found, 100/100 summaries with an overview, 1,463 / 1,463 sentences that cite
+claims carry their sources, 0 dropped; the same figures for every field family as 1.6.0. The scripted browser check
+(24 steps, 1440 px and 390 px) passes on the committed smoke viewer and axe-core 4.14 reports 0 violations on all 10
+views. 178 offline unit tests (165 in 1.6.0). The default time budget stays 40 minutes from process start.
 
 ## Version 1.6.0 (1 Nov): nothing from another organisation's site, profile or group under the company
 

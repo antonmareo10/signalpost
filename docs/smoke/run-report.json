@@ -1,9 +1,9 @@
 {
-  "run_id": "run-20261101T205303Z",
-  "agent_version": "1.6.0",
-  "started_at": "2026-11-01T20:53:03Z",
-  "completed_at": "2026-11-01T20:55:03Z",
-  "wall_clock_seconds": 119.8,
+  "run_id": "run-20261102T011059Z",
+  "agent_version": "1.6.1",
+  "started_at": "2026-11-02T01:10:59Z",
+  "completed_at": "2026-11-02T01:13:01Z",
+  "wall_clock_seconds": 122.7,
   "inputs": 100,
   "emitted_envelopes": 100,
   "status_counts": {
@@ -102,19 +102,19 @@
     }
   },
   "operations": {
-    "requests": 1024,
-    "bytes": 109970378,
-    "p50_request_ms": 967,
-    "p95_request_ms": 1718,
-    "p50_company_ms": 7578,
-    "p95_company_ms": 15623,
+    "requests": 1029,
+    "bytes": 110474486,
+    "p50_request_ms": 421,
+    "p95_request_ms": 2141,
+    "p50_company_ms": 6890,
+    "p95_company_ms": 14827,
     "third_party_cost_usd": 0.0,
     "search_provider": null,
     "search_calls": 0,
     "nav_feed": {
       "state": "available",
-      "pages": 189,
-      "active_ads": 9175,
+      "pages": 190,
+      "active_ads": 8310,
       "matched_companies": 0,
       "error": null
     },
@@ -124,14 +124,14 @@
       "paced_wait_cap_seconds": 300.0
     },
     "top_hosts": {
-      "data.brreg.no": 619,
-      "pam-stilling-feed.nav.no": 190,
+      "data.brreg.no": 623,
+      "pam-stilling-feed.nav.no": 191,
       "www.aelektronikk.no": 6,
       "7-eleven.no": 6,
       "devoldsregnskap.no": 6,
       "stronen.no": 5,
-      "atg.no": 5,
-      "svorka.no": 5
+      "svorka.no": 5,
+      "atg.no": 5
     }
   },
   "validation": {
@@ -145,6 +145,6 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "previous_envelopes": "run-20261101T205102Z.jsonl",
+  "previous_envelopes": "run-20261102T010858Z.jsonl",
   "viewer": "site/index.html"
 }
