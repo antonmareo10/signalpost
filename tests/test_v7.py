@@ -224,25 +224,14 @@ class EmailDomainListingCheckTests(unittest.TestCase):
             agent.footprint(work)
         return work
 
-    def test_a_domain_the_register_lists_for_another_organisation_is_related(self):
-        work = self.run_footprint(hjemmeside("marinor.no", [{"organisasjonsnummer": "913207521", "navn": "MARINOR SERVICE AS",
-                                                               "hjemmeside": "www.marinor.no", "organisasjonsform": {"kode": "AS"}}]))
-        self.assertIsNone(work.ledger.first("official_website"))
-        self.assertEqual(work.states["website"], "ambiguous")
-        self.assertIn("register lists this website for another organisation", work.notes["website"])
-        self.assertEqual(work.discovery[0]["outcome"], "related")
-
-    def test_no_answer_from_the_register_is_not_checked_not_published(self):
-        work = self.run_footprint(hjemmeside("marinor.no", None))
-        self.assertIsNone(work.ledger.first("official_website"))
-        self.assertEqual(work.states["website"], "failed")
-        self.assertIn("did not answer", work.notes["website"])
-
-    def test_a_domain_nobody_else_lists_is_still_published_from_the_register(self):
-        work = self.run_footprint(hjemmeside("marinor.no", []))
-        website = work.ledger.first("official_website")
-        self.assertEqual((website["value"], website["basis"]), ("https://marinor.no", "registry_listing"))
-        self.assertEqual(work.states["website"], "available")
+    def test_the_e_mail_domain_of_a_site_that_refuses_the_crawler_is_never_published(self):
+        # 1.6.x published it from the register's e-mail listing when nobody else listed the domain; since 1.7.0 an inferred
+        # site must prove itself on its own pages, and a site that cannot be read cannot
+        for owners in ([{"organisasjonsnummer": "913207521", "navn": "MARINOR SERVICE AS", "hjemmeside": "www.marinor.no",
+                         "organisasjonsform": {"kode": "AS"}}], None, []):
+            work = self.run_footprint(hjemmeside("marinor.no", owners))
+            self.assertIsNone(work.ledger.first("official_website"))
+            self.assertEqual(work.states["website"], "blocked")
 
 
 class SessionIdTests(unittest.TestCase):

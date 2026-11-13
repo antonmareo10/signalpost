@@ -123,9 +123,11 @@ class SmallCompanyTests(unittest.TestCase):
         return researcher._decide(Company(org=ORG, name="BJELK AS"), Candidate("https://bjelk.no", "domain_guess_from_legal_name",
                                                                              "weak", note), base, "bjelk.no")
 
-    def test_unique_name_alone_verifies_an_operating_company_but_not_a_small_one(self):
+    def test_unique_name_alone_no_longer_verifies_a_guessed_domain(self):
+        # 1.6.1 verified a guessed domain on the name alone when no other registered entity carried it; an official run
+        # gave ISABELLA CAFE AS an Illinois café's site that way (1.7.0)
         from signalpost.web import LOW_ACTIVITY
-        self.assertEqual(self._decide("")[0], "verified")
+        self.assertEqual(self._decide("")[0], "rejected")
         self.assertEqual(self._decide(LOW_ACTIVITY)[0], "rejected")
 
     def test_small_company_still_verified_by_orgnr_or_registered_contact(self):
@@ -201,5 +203,7 @@ class SharedNameTests(unittest.TestCase):
                  "name_anywhere": None, "domain_name": None, "legal_name_exact": None, "norwegian_context": True}
         state, _, _ = researcher._decide(Company(org="932561158", name="LEGENTIC SERVICES AS"),
                                          Candidate("https://legentic.com", "domain_guess_from_legal_name", "weak"), proof, "legentic.com")
-        self.assertEqual(calls, [["legentic"]])  # "services" is generic: the domain only matched "legentic"
+        # since 1.7.0 a name that matches the domain is never enough without the number or a registered contact detail,
+        # so the register's name search is not even asked
+        self.assertEqual(calls, [])
         self.assertEqual(state, "rejected")

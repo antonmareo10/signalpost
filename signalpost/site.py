@@ -477,7 +477,7 @@ function renderProfile(row,c){seedSources(c);
   const places=li(claims(c,"workplace"),x=>esc(x.d)+(x.employees!=null?` <span class="pill">${esc(x.employees)} employees</span>`:""));
   const profiles=li(claims(c,"social_profile"),x=>`<span class="pill">${esc(x.platform)}</span> `+link(x.v,host(x.v)));
   const proofs=li(claims(c,"website_identity_proof"),x=>esc(x.d));
-  const extra=li(claims(c,"additional_website"),x=>"Also verified: "+link(x.v))+li(claims(c,"website_description"),x=>"“"+esc(x.d)+"”")+li(claims(c,"website_email"),x=>esc(x.d));
+  const extra=li(claims(c,"additional_website"),x=>"Also verified: "+link(x.v))+li(claims(c,"website_description"),x=>"“"+esc(x.d)+"”")+li(claims(c,"website_email"),x=>esc(x.d))+li(claims(c,"website_phone"),x=>esc(x.d));
   const jobs=claims(c,"job_posting").sort((a,b)=>String(b.t||"").localeCompare(String(a.t||""))).map(x=>`<li>${link(x.url,x.d)}${cite(c,[x.i])}<div class="src">published ${esc(x.t||"?")}${x.expires?` · apply by ${esc(x.expires)}`:""}</div></li>`).join("");
   const careers=li(claims(c,"careers_page"),x=>link(x.v));
   const TL={website_post:"Own channels",registry_role_change:"Roles register",job_posting:"Job ad",registry_update:"Register",accounts_filed_event:"Accounts filed",employees_history:"Employees"};

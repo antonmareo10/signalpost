@@ -272,6 +272,12 @@ def candidate_slugs(company: Company) -> list[str]:
     if len(toks) >= 2 and len(toks[0]) >= 6 and toks[0] not in GENERIC and not toks[0].isdigit() \
             and all(t in GENERIC for t in toks[1:]):
         out.append(toks[0].replace("aa", "a"))
+    # "BLOMSTER & GAVEKURVEN AS" is written with "og" in a domain as often as without it
+    if "&" in company.name:
+        with_og = name_tokens_with_connectors(company.name.replace("&", " og "))
+        joined_og = "".join(with_og).replace("aa", "a")
+        if 2 <= len(with_og) <= 5 and 6 <= len(joined_og) <= 40 and joined_og not in out:
+            out += [joined_og, "-".join(t.replace("aa", "a") for t in with_og)]
     return out
 
 
@@ -534,11 +540,9 @@ class SiteResearcher:
         all_text = " ".join(p.text for _, p in pages)
         # A lang="no" attribute alone is not Norwegian context: hosted builders (Google Sites, for one) set it from the
         # visitor's Accept-Language. It counts only when the visible text is Norwegian too.
-        proof["norwegian_context"] = bool(host_of(pages[0][0].final_url or "").endswith(".no")
-                                          or (lang in ("no", "nb", "nn") and looks_norwegian(all_text))
-                                          or (company.postcode and company.postcode in all_text)
-                                          or (company.city and company.city.lower() in all_text.lower())
-                                          or re.search(r"\b(norge|norway|org\.? ?nr)\b", all_text, re.I))
+        # Since 1.7.0 the context is the .no domain or Norwegian text only: four digits that happen to equal the postcode, or
+        # the word "Norway" on a foreign page, made isabellacafe.com (a café in Illinois) look Norwegian to an official run.
+        proof["norwegian_context"] = bool(host_of(pages[0][0].final_url or "").endswith(".no") or looks_norwegian(all_text))
         return proof
 
     def _name_unique(self, company: Company, words: list[str] | None = None) -> bool | None:
@@ -592,10 +596,6 @@ class SiteResearcher:
             if candidate.strength == "strong":
                 return "related", 0.5, f"registered website names a company with another legal form ({named})"
             return "rejected", 0.2, f"site names a company with another legal form ({named})"
-        if candidate.strength != "strong" and not contact and not foreign and proof["name_identity"] and domain_name \
-                and candidate.note != LOW_ACTIVITY:
-            proof["name_unique_in_register"] = self._name_unique(company, None if full_match else distinctive(core))
-
         if candidate.strength == "strong":
             if foreign and not proof["name_identity"]:
                 return "related", 0.5, f"site shows another organisation number ({', '.join(proof['other_orgnrs'][:2])})"
@@ -604,37 +604,32 @@ class SiteResearcher:
             if proof["name_identity"] or (proof["name_anywhere"] and (domain_name or contact)) or (contact and domain_name):
                 return "verified", 0.93, "registered website shows the legal name, or a registered contact detail on a matching domain"
             if domain_name:
-                return "verified", 0.9, "registered website domain matches the legal name"
+                # Since 1.7.0 the register listing plus a matching domain is not enough when the site itself shows neither
+                # the name nor a registered contact detail: a lapsed domain may have been taken over by someone else.
+                return "rejected", 0.3, "registered website shows neither the company's name nor its registered contact details"
             if contact:
                 return "related", 0.6, "registered website shares the company's contact details but names another business (group/manager site)"
             return "rejected", 0.3, "registered website lacks exact-entity evidence"
         if foreign:
             return "rejected", 0.2, f"site shows another organisation number ({', '.join(proof['other_orgnrs'][:2])})"
+        # A site we inferred (the domain of the registered e-mail address, a NAV ad's homepage, a domain guessed from the
+        # name, a search result) is published only when the site itself ties it to this exact company: the organisation
+        # number (above), the legal name in the site's identity text together with the registered phone, e-mail or
+        # street address, or the full legal name with its legal form ("Isabella Cafe AS") on a Norwegian site named after
+        # the company. Since 1.7.0 a name that merely matches the domain is not enough, however unique it is in the
+        # register: an official run gave ISABELLA CAFE AS (Hønefoss) isabellacafe.com, a café in Illinois, and WATAHA BYGG
+        # AS wataha.no, a Polish association's site, that way.
         exact_name = proof.get("legal_name_exact")
-        if candidate.strength == "medium":
-            if proof["name_identity"] and (contact or domain_name):
-                return "verified", 0.95, "legal name on the site plus registered contact detail or matching domain"
-            if exact_name and final_host.endswith(".no"):
-                return "verified", 0.95, "the full registered legal name (unique in Norway) is printed on the site"
-            if proof["name_anywhere"] and contact and domain_name:
-                return "verified", 0.93, "legal name, registered contact detail and matching domain"
-            return "rejected", 0.4, "insufficient exact-entity evidence"
-        # Discovered (guessed/searched) domains must also *be named after* the company: directories and
-        # aggregators print a company's name and phone number too, but on their own domain.
-        if not domain_name:
+        if candidate.strength != "medium" and not domain_name:
+            # Guessed and searched domains must also *be named after* the company: directories and aggregators print a
+            # company's name and phone number too, but on their own domain.
             return "rejected", 0.3, "discovered domain is not named after the company (directory/aggregator risk)"
         if proof["name_identity"] and contact:
-            return "verified", 0.95, "legal name and a registered contact detail on a site named after the company"
-        if exact_name:
-            return "verified", 0.94, "the full registered legal name (unique in Norway) is printed on a site named after the company"
-        if proof["name_identity"] and proof.get("name_unique_in_register") and proof.get("norwegian_context") \
-                and candidate.note != LOW_ACTIVITY:
-            return "verified", 0.92, "on-site name and domain match the legal name, and no other registered entity carries that name"
-        if proof["name_identity"] and "name_unique_in_register" in proof and proof["name_unique_in_register"] is None \
-                and proof.get("norwegian_context") and candidate.note != LOW_ACTIVITY:
-            # the decisive check could not run: report it as not checked (the previous run's value is kept), not as rejected
-            return "unreachable", 0.0, "the register's name search did not answer, so the name could not be checked"
-        return "rejected", 0.3, "insufficient exact-entity evidence for a discovered domain"
+            return "verified", 0.95, "the legal name and a registered phone, e-mail or street address are shown on the site"
+        if exact_name and domain_name and proof.get("norwegian_context"):
+            return "verified", 0.94, "the full registered legal name with its legal form is printed on a Norwegian site named after the company"
+        return "rejected", 0.3, ("insufficient exact-entity evidence: the site shows neither the organisation number nor the legal "
+                                 "name with a registered phone, e-mail or address")
 
 
 STREET_SUFFIX = re.compile(r"(veien|vegen|veg|vei|vn|v|gata|gaten|gate|gt|g|plassen|plass|alle|allee|alleen|bakken|brygga|bryggen|"
@@ -733,6 +728,8 @@ def legal_name_hit(legal_name: str, text: str) -> str | None:
             if before.isalpha() and before not in {"av", "fra", "til", "hos", "og", "i", "c", "copyright", "ved", "for", "drives",
                                                      "levert", "eies", "eiet", "eier", "med"} and len(before) > 2 and not text[flat[index - 1][1]:flat[index][0]].strip():
                 continue  # part of a longer company name such as "Nord Lislegard Maskin AS"
+            if not text[flat[index + n - 1][0]:flat[index + n - 1][1]].isupper():
+                continue  # "Isabella Cafe as a family business": the English word "as", not the legal form AS
             return text[flat[index][0]:flat[index + n - 1][1]]
     return None
 
@@ -1150,6 +1147,30 @@ def extract_site(ledger: Ledger, company: Company, site: SiteResult, primary: bo
                     emails_seen.add(email)
                     ledger.text_claim(doc, f"[link] {link.url} {link.text}".strip(), "website", "website_email", email,
                                       confidence=0.9, method="verified_site_mailto")
+    # The company's phone number as its own site links it (tel:) in the header or footer that every page repeats (on the
+    # contact page only the registered number: its other numbers are often staff members' mobiles). A number a link
+    # names after a person in the company's roles is that person's, so it is left out.
+    phones_seen: set[str] = set()
+    people = [set(tokens(p)) for p in company.people if len(tokens(p)) >= 2]
+    for index, (doc, page) in enumerate(docs):
+        if index and directory_page(page):
+            continue
+        contact_page = bool(re.search(r"kontakt|contact", urllib.parse.urlsplit(doc.url).path.lower()))
+        for link in page.links:
+            if not link.url.lower().startswith("tel:") or "%" in link.url:
+                continue
+            number = link.url[4:].strip()
+            digits = phone_digits(number)
+            if not (link.in_footer or link.in_header or (contact_page and digits in company.phones)):
+                continue
+            label = set(tokens(link.text))
+            if not digits or digits in phones_seen or len(phones_seen) >= 2 or any(p <= label for p in people):
+                continue
+            claim = ledger.text_claim(doc, f"[link] {link.url} {link.text}".strip(), "website", "website_phone", number,
+                                      display=f"Phone on {site_host}: {number}", confidence=0.9, method="verified_site_tel_link",
+                                      extra={"digits": digits, "matches_registered_phone": digits in company.phones})
+            if claim:
+                phones_seen.add(digits)
     return out
 
 
@@ -1527,3 +1548,169 @@ def news_page_url(site: SiteResult) -> str | None:
                                                                     r"nyheiter|siste-nytt|pressemeldinger)/?", path):
             return link.url.split("#")[0]
     return None
+
+
+# -- open job postings and dated articles linked from the verified site (1.7.0) ---------------------------------------
+# An applicant-tracking system's link to one advert carries the advert's id; a company's own careers page links its
+# adverts one level below a job path ("/ledige-stillinger/elektriker-oslo").
+ATS_POSTING = re.compile(r"(/jobs?/\d|/job/[\w-]*\d|/stilling/\d|/stillinger/stilling/[0-9a-f-]{8,}|finnkode=\d|advertid=\d|"
+                         r"[?&](job_?id|jobid|ad_?id|annonseid)=\d|/vacanc(y|ies)/\d|/ad/\d|/what:job/jobid:\d|/j/[a-z0-9]{6,}|"
+                         r"/position/\d|/\d{4,}-[a-z])", re.I)
+OWN_POSTING = re.compile(r"/(ledige-stillinger|ledige_stillinger|stillinger|stilling|jobb|jobs?|vacancies|ledig-stilling)"
+                         r"/[^/?#]{6,}/?$", re.I)
+NOT_A_POSTING = re.compile(r"^(les mer|sok|sok her|sok na|se alle|se ledige|se stillingen|ledige stillinger|stillinger|karriere|jobb|"
+                           r"jobber|jobs?|careers?|apply|apply now|send soknad|apen soknad|open application|generell soknad|"
+                           r"read more|mer info|vis alle|vis mer|see all|all jobs|alle stillinger|alle jobber|tilbake|back|logg inn|"
+                           r"login|personvern|privacy|cookies?|jobbe hos oss|jobb hos oss|bli en av oss|var historie|om oss|kontakt|"
+                           r"kontakt oss|hjem|forside|home|neste|forrige|next|previous|del|share|facebook|linkedin|instagram)$")
+OPEN_APPLICATION = re.compile(r"(apen soknad|open application|generell soknad|apen sooknad|spontansoknad|spontaneous application)")
+
+
+def career_postings(fetch_page, ledger: Ledger, company: Company, site: SiteResult, careers: list[dict[str, Any]], today: str,
+                    limit: int = 10) -> list[dict[str, Any]]:
+    """Open positions the company's own careers page lists. Listed on the careers page at retrieval means open.
+
+    Only where the listing can only be this company's: a JSON-LD JobPosting whose hiringOrganization names the company
+    (and whose validThrough date has not passed); a link to a single advert on an applicant-tracking account named after
+    the company (skytale.teamtailor.com); or a link to a single advert below a job path of the company's own site when
+    the site is named after the company and prints no other organisation number. A group's careers page lists its sister
+    companies' adverts too (eccera.com lists Linköping and Stockholm jobs), so its links are not taken. "Open
+    application" and navigation links are not postings. When the careers page only links an "all positions" page on the
+    same host, that page is read once."""
+    site_root = registrable(host_of(site.home_url))
+    own_names = [set(company.core)] + [set(name_tokens(b)) for b in company.brands if name_tokens(b)]
+    single_site = domain_match(company, host_of(site.home_url))[1] and not site.proof.get("other_orgnrs")
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def named_account(host: str) -> bool:
+        # the applicant-tracking account's subdomain spells the company's name (skytale.teamtailor.com)
+        return single_site and domain_match(company, domain_key(host.split(".")[0]) + ".no")[1]
+
+    queue = [c["url"] for c in careers[:2]]
+    followed = False
+    while queue and len(out) < limit:
+        url = queue.pop(0)
+        result, page = fetch_page(url)
+        if page is None:
+            continue
+        final = result.final_url or url
+        host = host_of(final)
+        is_ats = any(host == ats or host.endswith("." + ats) for ats in ATS_HOSTS)
+        if not (host.endswith(site_root) or (is_ats and named_account(host))):
+            continue
+        doc, _ = page_documents([(result, page)], "company_applicant_tracking_page" if is_ats else "company_owned_website")[0]
+        found_here = 0
+        for item in page.jsonld_flat():
+            if str(item.get("@type", "")).lower() != "jobposting" or len(out) >= limit:
+                continue
+            title = squash(str(item.get("title") or item.get("name") or ""))
+            valid = str(item.get("validThrough") or "")[:10]
+            posted = str(item.get("datePosted") or "")[:10]
+            employer = item.get("hiringOrganization")
+            employer_name = str(employer.get("name") if isinstance(employer, dict) else employer or "")
+            if not 4 <= len(title) <= 120 or (valid and valid < today) or OPEN_APPLICATION.search(fold(title)) \
+                    or not any(words and words <= set(tokens(employer_name)) for words in own_names):
+                continue
+            item_url = str(item.get("url") or final).split("#")[0]
+            line = next((l for l in doc.text.split("\n") if l.startswith("[json-ld]") and title[:40] in l[:500]), None)
+            if not line or item_url in seen:
+                continue
+            claim = ledger.text_claim(doc, line[:500], "hiring", "job_posting", {"title": title}, qualifier=item_url,
+                                      display=title, effective_at=posted if re.fullmatch(r"\d{4}-\d{2}-\d{2}", posted) else None,
+                                      confidence=0.9, method="verified_site_careers_json_ld",
+                                      extra={"url": item_url, "listed_on": url, "source": "company_careers_page",
+                                             "event_date": posted or None, "expires": valid or None})
+            if claim:
+                seen.add(item_url)
+                found_here += 1
+                out.append({"title": title, "url": item_url, "claim_id": claim["id"]})
+        more: str | None = None
+        for link in page.links:
+            if len(out) >= limit:
+                break
+            target = link.url.split("#")[0]
+            text = squash(link.text)
+            folded = fold(text).strip(" .:!>»›-")
+            link_host = host_of(target)
+            if re.fullmatch(r"(alle|se alle|se ledige|vis alle)? ?(ledige )?(stillinger|jobber|jobs|positions)|all jobs|ledige stillinger",
+                            folded) and link_host == host and target.rstrip("/") != final.rstrip("/"):
+                more = more or target
+            if target in seen or target.rstrip("/") in (url.rstrip("/"), final.rstrip("/")) or not 6 <= len(text) <= 100:
+                continue
+            if NOT_A_POSTING.match(folded) or NAV_TEXT.search(folded) or CAREER_TEXT.match(folded) or OPEN_APPLICATION.search(folded):
+                continue
+            ats_link = any(link_host == ats or link_host.endswith("." + ats) for ats in ATS_HOSTS)
+            path = urllib.parse.urlsplit(target).path
+            if ats_link:
+                if not (named_account(link_host) and ATS_POSTING.search(target)):
+                    continue
+            elif link_host.endswith(site_root):
+                if not (single_site and OWN_POSTING.search(path)) or career_path(path.rstrip("/").split("/")[-1]):
+                    continue
+            else:
+                continue
+            claim = ledger.text_claim(doc, f"[link] {link.url} {link.text}".strip(), "hiring", "job_posting", {"title": text, "url": target},
+                                      qualifier=target, display=text, confidence=0.85, method="verified_site_careers_link",
+                                      extra={"url": target, "listed_on": url, "source": "company_careers_page", "event_date": None})
+            if claim:
+                seen.add(target)
+                found_here += 1
+                out.append({"title": text, "url": target, "claim_id": claim["id"]})
+        if not found_here and more and not followed:
+            followed = True
+            queue.insert(0, more)
+    return out
+
+
+def article_posts(fetch_page, ledger: Ledger, site: SiteResult, today: str, listing_pages: list[tuple[FetchResult, Page]],
+                  not_before: str | None = None, limit: int = 3) -> list[dict[str, Any]]:
+    """Dated articles linked from the verified site's news page (or home page) when neither a feed nor the teasers give a
+    date: the article page itself is read, and its date is taken from its JSON-LD (datePublished) or from the visible
+    text next to its headline (the only date within three lines of the h1)."""
+    site_root = registrable(host_of(site.home_url))
+    posts: list[dict[str, Any]] = []
+    links: list[str] = []
+    for result, page in list(listing_pages) + site.pages[:1]:
+        base_path = urllib.parse.urlsplit(result.final_url or page.url).path.rstrip("/")
+        for link in page.links:
+            target = link.url.split("#")[0].split("?")[0]
+            path = urllib.parse.urlsplit(target).path.rstrip("/")
+            text = squash(link.text)
+            if not host_of(target).endswith(site_root) or target in links or len(text) < 15 or NAV_TEXT.search(fold(text)):
+                continue
+            if not NEWS_PATH.search(path) or path == base_path or len(path.strip("/").split("/")[-1]) < 8:
+                continue
+            links.append(target)
+    for target in links[:limit]:
+        result, page = fetch_page(target)
+        if page is None or not host_of(result.final_url or target).endswith(site_root):
+            continue
+        found = jsonld_posts(ledger, SiteResult(site.candidate, "verified", home_url=site.home_url, pages=[(result, page)]),
+                             not_before=not_before)
+        found = [p for p in found if p["date"] <= today]
+        if found:
+            posts += found
+            continue
+        heading = squash(page.headings[0]) if page.headings else ""
+        lines = [squash(l) for l in page.text.split("\n")]
+        if len(heading) < 10 or heading not in lines or placeholder_post(heading) or test_post(heading):
+            continue
+        i = lines.index(heading)
+        window = lines[max(0, i - 3): i + 4]
+        dates = [(j, find_date(l, today)) for j, l in enumerate(window) if l and len(l) <= 80 and find_date(l, today)]
+        if len({d[1][0] for d in dates}) != 1:
+            continue
+        iso, raw = dates[0][1]
+        if not_before and iso < not_before:
+            continue
+        lo, hi = sorted((window.index(heading), dates[0][0]))
+        span = " ".join(window[lo:hi + 1])
+        doc, _ = page_documents([(result, page)], "company_owned_website")[0]
+        url = clean_url(result.final_url or target)
+        claim = ledger.text_claim(doc, span[:480], "activity", "website_post", {"title": heading[:120], "published": raw}, qualifier=url,
+                                  display=f"{iso} — {heading[:160]}", effective_at=iso, confidence=0.85,
+                                  method="dated_article_on_verified_site", extra={"event_date": iso, "url": url})
+        if claim:
+            posts.append({"date": iso, "title": heading, "url": url, "claim_id": claim["id"]})
+    return posts

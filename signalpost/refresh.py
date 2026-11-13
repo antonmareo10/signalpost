@@ -23,7 +23,7 @@ MULTI = {"role": ("new_role", "removed_role"), "workplace": ("new_location", "cl
 HIGH = {"legal_name", "business_address", "official_website", "bankrupt", "under_liquidation", "forced_dissolution", "group_parent",
         "accounting_period", "legal_form"}
 HIGH_ROLES = {"DAGL", "LEDE"}
-IGNORE = {"website_identity_proof", "website_email"}
+IGNORE = {"website_identity_proof", "website_email", "website_phone"}
 
 
 def load_previous(path: str | Path | None) -> dict[str, dict[str, Any]]:

@@ -117,8 +117,9 @@ employees, share capital, statutory purpose, VAT/business-register status, forme
 registered contact details, official English industry label), annual accounts for every year the register returns
 (company and group accounts, 20 line items) plus the official PDF copy of every filed year, roles (CEO, chair, board,
 deputies, auditor, accountant), registered workplaces, verified official website and identity proof, public brand, site
-description, company-owned social profiles, careers pages, active NAV job ads, dated posts/news from the company's own
-site, and the dated register history (what the register changed and when: employee count, filed accounts, addresses,
+description, the site's own phone number and generic e-mail address, company-owned social profiles, careers pages, active
+NAV job ads and (since 1.7.0) the open positions the company's own careers page lists, dated posts/news from the
+company's own site, and the dated register history (what the register changed and when: employee count, filed accounts, addresses,
 industry code, contact details, roles).
 
 ## How it decides what belongs to the company
@@ -135,19 +136,25 @@ industry code, contact details, roles).
    401/403/429) is never retried under another spelling. Since 1.5.0 an AS also gets the two spellings Norwegian
    companies often register with the legal form, `<name>as.no` and `<name>.as`, and a parent with no revenue of its own
    that heads an operating group (group revenue NOK 1M+) counts as operating.
-3. **Identity gate** on the fetched site (home page plus contact/about/terms pages, robots.txt respected):
-   organisation number printed on the site; or the legal name in the site's identity text together with a registered
-   phone/e-mail/street address; or the full legal name *with its legal suffix* (unique in the Register of Business
-   Enterprises) on a domain named after the company; or name + domain + Brreg name search proving no other registered
-   entity carries that name. Discovered domains must be named after the company (directories print names and phone
-   numbers too); a site printing another organisation number is rejected; a registered website that only shares
-   contact details is marked `related` (group/manager site), not published. For small active companies the name-search
-   route is not enough: fewer of them have a site at all, so their sites need the organisation number, the exact legal
-   name or the legal name plus a registered contact detail.
+3. **Identity gate** on the fetched site (home page plus contact/about/terms pages, robots.txt respected). Since 1.7.0
+   a site we *inferred* (the domain of the registered e-mail address, a NAV ad's homepage, a domain derived from the
+   name, a search result) is published only when the site itself ties it to this exact company: the organisation number
+   printed on the site; or the legal name in the site's identity text (title, header, footer, site name, JSON-LD
+   organisation) together with a registered phone, e-mail or street address; or the full legal name with its legal form
+   written as one ("Isabella Cafe AS", not "Isabella Cafe as a family restaurant") on a Norwegian site (a `.no` domain or
+   Norwegian text) named after the company. A name that merely matches the domain is not enough, however unique it is in
+   the register: 1.6.1 accepted that, and Builderr's 13 November review found an official run had given ISABELLA CAFE AS
+   (Hønefoss) isabellacafe.com, a café in Illinois, and WATAHA BYGG AS wataha.no, a Polish association's site. Guessed
+   and searched domains must also be named after the company (directories print names and phone numbers too); a site
+   printing another organisation number is rejected. A website the company itself lists in the register is published
+   when the site shows the legal name, a registered contact detail or the organisation number (since 1.7.0 a matching
+   domain alone is not enough: a lapsed domain may now be someone else's); one that only shares contact details is
+   marked `related` (group/manager site), not published.
    Since 1.3.0, a website the company itself lists in the register that answers but refuses automated access
    (robots.txt or HTTP 401/403/429) is published from the register listing when its domain is named after the company
-   (for the domain of the registered e-mail address, only when it spells the whole legal name). Its pages are not read,
-   so no brand, profile, careers page or post comes from it, and the profile says so. A domain that does not resolve
+   (until 1.6.1 also the domain of the registered e-mail address when it spelled the whole legal name; since 1.7.0 an
+   inferred domain must prove itself on its own pages). Its pages are not read, so no brand, profile, careers page or
+   post comes from it, and the profile says so. A domain that does not resolve
    with or without `www` is reported as gone (`not_available`), not as `blocked`.
    Since 1.5.0, a site that was inferred rather than registered (from the registered e-mail domain, a NAV ad, a
    name-derived domain or a search) and that does not print this company's organisation number is checked against
@@ -157,9 +164,7 @@ industry code, contact details, roles).
    legal person). On a fresh 1,000-company batch this caught a holding company that had been given its renamed sister
    company's website, a company sharing a municipal enterprise's e-mail domain, an owners' association given a
    construction company's project site and a group company given the group's site (see EVAL.md). If the register does
-   not answer, the site is reported as not checked rather than published. Since 1.6.0 the same check also runs before
-   the domain of the registered e-mail address is published from the register listing because its site refuses
-   automated access (another organisation lists it: `related`; no answer: not checked). The identity proof the gate
+   not answer, the site is reported as not checked rather than published. The identity proof the gate
    found is cited as an excerpt of the page (since 1.6.0 also an address printed over two lines, and an organisation
    number at the very end of a page).
 4. **Profiles and pages from a verified site** – social links must name the company/brand/domain (opaque numeric ids only
@@ -188,9 +193,17 @@ industry code, contact details, roles).
    only when `employer.orgnr` is the company or one of its registered workplaces. Contact persons are never stored.
    Ads are looked up by the names of the company and its workplaces, without store numbers ("NARVESEN BUTIKKEN 600"
    advertises as "Narvesen Harstad Sykehus"); the organisation number alone decides the match.
+   Since 1.7.0 also the open positions the company's own careers page lists (read once; listed means open): JobPosting
+   items in its JSON-LD whose `hiringOrganization` names the company (and whose `validThrough` date has not passed),
+   links to single adverts on an applicant-tracking account named after the company (`<name>.teamtailor.com`), and links
+   to single adverts below a job path of the company's own site (`/ledige-stillinger/<advert>`) when the site is named
+   after the company and prints no other organisation number. A group's careers page lists its sister companies'
+   adverts, so nothing is taken from it; "open application" and navigation links are not postings.
 6. **Dated activity** – the verified site's RSS/Atom feed (up to 10 items, nothing dated in the future), its WordPress
    REST API (`/wp-json/wp/v2/posts`, robots.txt honoured) when a WordPress site advertises no feed, dated JSON-LD articles,
-   and dated news teasers (the date must be in the teaser or the only date on the adjacent line). Posts dated before the
+   and dated news teasers (the date must be in the teaser or the only date on the adjacent line); since 1.7.0, when none
+   of these gives a dated item, up to three articles the news page (or home page) links are read and dated from their
+   own JSON-LD `datePublished` or the only date within three lines of the headline. Posts dated before the
    company was founded, lorem-ipsum excerpts, WordPress's install-time sample post and the theme demo posts dated up to two
    months after it are skipped, and `utm_*` parameters are removed from post links; plus dated register
    events: role changes, and Enhetsregisteret's update log filtered to this organisation number (only entries that state

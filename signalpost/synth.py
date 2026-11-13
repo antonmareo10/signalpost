@@ -334,15 +334,21 @@ def build_summary(ledger: Ledger, ctx: dict[str, Any]) -> dict[str, Any]:
             text += "; it links to company profiles on " + _join(sorted({_platform(p) for p in profiles}))
             ids.extend(p["id"] for p in profiles)
         people.append(_sentence(text + ".", ids))
-    jobs = ledger.by_field("job_posting")
+    all_jobs = ledger.by_field("job_posting")
+    jobs = [j for j in all_jobs if j.get("source") != "company_careers_page"]  # NAV's feed
+    listed = [j for j in all_jobs if j.get("source") == "company_careers_page"]  # the company's own careers page (1.7.0)
     careers = ledger.by_field("careers_page")
     if jobs:
         latest_job = max(jobs, key=lambda j: j.get("event_date") or "")
         people.append(_sentence(f"It is hiring: {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''} on NAV's arbeidsplassen.no, most recently "
                                 f"“{latest_job['value']['title']}” published {latest_job.get('event_date')}.",
                                 [j["id"] for j in jobs], {"n": float(len(jobs))}))
-        signals.append(_sentence(f"Hiring now: {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''}.", [j["id"] for j in jobs],
-                                 {"n": float(len(jobs))}, tone="up"))
+    if listed:
+        people.append(_sentence(f"Its own careers page lists {len(listed)} open position{'s' if len(listed) != 1 else ''}, such as "
+                                f"“{listed[0]['value']['title']}”.", [j["id"] for j in listed], {"n": float(len(listed))}))
+    if all_jobs:
+        signals.append(_sentence(f"Hiring now: {len(all_jobs)} open position{'s' if len(all_jobs) != 1 else ''} advertised.",
+                                 [j["id"] for j in all_jobs], {"n": float(len(all_jobs))}, tone="up"))
     elif careers:
         people.append(_sentence("No active ad was found on NAV's job feed, but its website links to a careers page.", [c["id"] for c in careers]))
     posts = sorted(ledger.by_field("website_post"), key=lambda p: p.get("event_date") or "", reverse=True)
@@ -600,7 +606,9 @@ def _overview_presence(ledger: Ledger) -> dict[str, Any] | None:
             ids.extend(p["id"] for p in profiles)
         bits.append(text)
     if jobs:
-        bits.append(f"it is hiring, with {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''} on NAV")
+        nav = [j for j in jobs if j.get("source") != "company_careers_page"]
+        where = "on NAV" if len(nav) == len(jobs) else ("on its own careers page" if not nav else "on NAV and its own careers page")
+        bits.append(f"it is hiring, with {len(jobs)} open position{'s' if len(jobs) != 1 else ''} advertised {where}")
         ids.extend(j["id"] for j in jobs)
         derived["jobs"] = float(len(jobs))
     if posts and posts[0].get("event_date"):

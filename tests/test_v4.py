@@ -334,7 +334,9 @@ class RefreshRobustnessTests(unittest.TestCase):
         changes, _ = diff({"claims": [old]}, {"run": {"run_id": "r2"}, "claims": carried}, set())
         self.assertEqual(changes, [])
 
-    def test_name_search_outage_is_not_a_rejection(self):
+    def test_name_alone_is_rejected_without_asking_the_register(self):
+        # 1.6.x asked the register's name search before verifying a guessed domain on the name alone (an outage made the
+        # site "not checked"); since 1.7.0 the name alone never verifies a guessed domain, so the outage does not matter.
         html = ("<html><head><title>Supermercado</title></head><body><h1>Supermercado</h1><p>Spansk og latinamerikansk mat i Oslo. "
                 "Vi har åpent hver dag og leverer til hele Norge.</p></body></html>")
         down = lambda u: failed(u, status=503, error="HTTP 503")  # noqa: E731
@@ -349,4 +351,4 @@ class RefreshRobustnessTests(unittest.TestCase):
         fetcher.get = get
         found = SiteResearcher(fetcher).research(Company(org="916361750", name="SUPERMERCADO AS", employees=3),
                                                  Candidate("https://supermercado.no", "domain_guess_from_legal_name", "weak"))
-        self.assertEqual(found.state, "unreachable")
+        self.assertEqual(found.state, "rejected")

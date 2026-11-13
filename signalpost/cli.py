@@ -26,6 +26,7 @@ FAMILIES = {
     "legal_name": "identity", "website_description": "description", "public_brand": "brand",
     "annual_accounts_copy": "annual_account_documents", "registry_update": "register_history", "industry_en": "industry_label_en",
     "registry_role_change": "register_history", "employees_history": "register_history",
+    "website_email": "website_contact", "website_phone": "website_contact",
 }
 
 

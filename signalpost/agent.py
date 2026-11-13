@@ -25,8 +25,8 @@ from .registry import (IndustryLabels, account_claims, account_copy_claims, enti
 from .search import SearchProvider
 from .synth import build_summary
 from .ledger import supports
-from .web import (FREEMAIL, LOW_ACTIVITY, Candidate, Company, SiteResearcher, SiteResult, candidate_slugs, domain_match, extract_site,
-                  feed_posts,
+from .web import (FREEMAIL, LOW_ACTIVITY, Candidate, Company, SiteResearcher, SiteResult, article_posts, candidate_slugs, career_postings,
+                  domain_match, extract_site, feed_posts,
                   handle_matches, host_of, jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits,
                   registrable, wordpress_posts)
 
@@ -191,8 +191,9 @@ class Agent:
             add(email_domain(unit.get("email")), "registry_subunit_email_domain", "medium", unit.get("email") or "")
         tier = self._activity_tier(company)
         if self.guess_domains and tier:
-            # Small but active companies (often owner-run, with no registered employees) get guesses too, but their sites
-            # need stronger proof: see LOW_ACTIVITY in web.SiteResearcher._decide.
+            # Small but active companies (often owner-run, with no registered employees) get guesses too. Since 1.7.0 every
+            # guessed site needs the same proof (the organisation number, the legal name with a registered contact detail,
+            # or the full legal name with its legal form), so the LOW_ACTIVITY note only labels the candidate.
             note = "" if tier == "operating" else LOW_ACTIVITY
             slugs = candidate_slugs(company)
             for brand in company.brands[:2]:
@@ -309,7 +310,9 @@ class Agent:
                 unreachable_own = True  # the site answered but the register check behind it did not: keep the previous value
             if result.state == "blocked" and candidate.strength in ("strong", "medium"):
                 blocked = True  # a refused *guess* says nothing about the company's own site
-                if candidate.source in ("registry_website", "registry_email_domain"):
+                if candidate.source == "registry_website":
+                    # Since 1.7.0 only the website the company itself lists in the register: the domain of its e-mail
+                    # address is inferred, and a site that refuses to be read cannot prove whose it is.
                     refused_own.append((candidate, result))
             if result.state == "blocked" and "HTTP 429" in result.reason:
                 # "Too many requests" is not an answer about the company: a site verified last run that asks us to slow
@@ -357,6 +360,14 @@ class Agent:
                         if page is not None and host_of(result.final_url or news_url).endswith(registrable(host_of(verified.home_url))):
                             extra_pages.append((result, page))
                     work.posts = news_items(ledger, verified, self.today, extra_pages, not_before=founded)
+                    if not work.posts and self.remaining() > 30:
+                        # 1.7.0: read the newest articles the news page (or home page) links, and date them from the article
+                        work.posts = article_posts(self.sites._fetch_page, ledger, verified, self.today, extra_pages,
+                                                   not_before=founded)
+                if work.site.get("careers") and self.remaining() > 30:
+                    # 1.7.0: the open positions the company's own careers page lists (or the applicant-tracking page it links)
+                    work.site["postings"] = career_postings(self.sites._fetch_page, ledger, company, verified, work.site["careers"],
+                                                            self.today)
             work.states["website"] = "available" if work.site.get("claim_id") else "failed"
         elif work.site:
             pass  # registered website that refuses automated access (state and note set above)
