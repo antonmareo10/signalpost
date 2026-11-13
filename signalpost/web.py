@@ -55,7 +55,7 @@ PUBLIC_SUFFIX_2 = {"co.uk", "org.uk", "com.au", "co.nz", "com.br", "priv.no", "k
 # NordkappNett AS"): the page is the host's, so it is never the company's website, whatever its length.
 HOST_PLACEHOLDER = ("this domain is hosted by", "domain is hosted by", "dette domenet er hostet", "dette domenet driftes av",
                     "domenet er registrert hos", "this domain has been registered", "domain has been registered by")
-PARKED = ("is parked", "has expired", "parkedweb", "does not have an active website", "domain is for sale", "domain for sale", "domenet er til salgs", "this domain may be for sale", "kjøp dette domenet",
+PARKED = ("parkeringsside for", "parkering domene.no", "is parked", "has expired", "parkedweb", "does not have an active website", "domain is for sale", "domain for sale", "domenet er til salgs", "this domain may be for sale", "kjøp dette domenet",
           "hugedomains", "parked at", "parkert", "domeneshop.no/park", "her flytter snart en ny gjest", "is parked free",
           "buy this domain", "denne domenen er parkert", "domain parking", "sedo.com", "dan.com", "afternic",
           "under construction", "kommer snart", "coming soon", "website is under construction", "nettsiden er under arbeid",
@@ -365,7 +365,7 @@ class SiteResearcher:
             return SiteResult(candidate, "parked", "the web host's default page, not a company site", home_url=result.final_url,
                               pages=pages)
         if any(marker in lowered for marker in PARKED) or len(home.text) < 40 and not home.jsonld:
-            if len(home.text) < 600 or any(marker in lowered for marker in PARKED[:16]):
+            if len(home.text) < 600 or any(marker in lowered for marker in PARKED[:18]):
                 return SiteResult(candidate, "parked", "placeholder, parked or empty page", home_url=result.final_url, pages=pages)
         proof = self._proof(company, pages)
         if not proof["orgnr"]:

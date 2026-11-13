@@ -100,6 +100,18 @@ class RegisteredSiteTests(unittest.TestCase):
         self.assertEqual(found.state, "verified")
 
 
+class ParkedPageTests(unittest.TestCase):
+    def test_a_registered_domain_now_on_a_parking_page_is_not_published(self):
+        # surveyservice.no: "Parkering domene.no — Parkeringsside for surveyservice.no"; the domain spells the name, so 1.6.1
+        # published it as the company's site from a guess
+        html = ("<html><head><title>Parkering domene.no</title></head><body>Parkeringsside for surveyservice.no Domenenavnet "
+                "surveyservice.no eies av en av våre mange kunder. Vi tilbyr domeneregistrering, webhosting, produksjon av "
+                "hjemmesider mm. Ta kontakt så hjelper vi deg å kartlegge dine behov. www.domene.no kundeweb login</body></html>")
+        found = research(Company(org="1", name="SURVEYSERVICE AS", legal_form="AS"), "https://surveyservice.no", html,
+                         "registry_website", "strong")
+        self.assertEqual(found.state, "parked")
+
+
 class SitePhoneTests(unittest.TestCase):
     def test_the_footer_phone_is_published_and_a_person_s_number_is_not(self):
         company = Company(org="1", name="VAKTMESTER ANDERSEN AS", people=["Kari Nordmann"])
