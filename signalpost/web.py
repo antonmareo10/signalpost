@@ -1332,10 +1332,53 @@ PLACEHOLDER_POSTS = {"hello world", "hei verden", "hallo verden", "hej verden", 
                      "bonjour tout le monde", "ciao mondo", "ola mundo", "hei maailma", "witaj swiecie"}
 
 
+# Posts that are not the company's activity (1.7.0): gambling and pharmacy spam injected into a hacked site ("Online
+# Kasino Platit Pomocí Paypal 2026" on a tiler's WordPress), WordPress's default welcome post in Norwegian, and pages
+# that a feed lists like posts ("Kontakt", "Om oss").
+SPAM_POST = re.compile(r"\b(casino|kasino|kasina|gambling|automaty|automaten|automatem|hracim|zdarma|vkladu|slots?|spilleautomater|"
+                       r"spielautomaten|poker|roulette|ruleta|blackjack|craps|jackpot|betting|sportsbook|bookmaker|viagra|cialis|"
+                       r"levitra|escort|payday|replica)\b")
+STUB_POSTS = {"kontakt", "kontakt oss", "om oss", "om meg", "blogg", "blog", "hjem", "forside", "tjenester", "priser", "galleri",
+              "nyheter", "home", "about", "about us", "contact", "contact us", "services", "sample page", "eksempelside",
+              "velkommen til redigeringsverktoyet gutenberg", "welcome to the gutenberg editor"}
+
+
 def test_post(title: str) -> bool:
-    """"Test", "TEst 2 – hubspot", "Testinnlegg": a post someone published to try the site, not company activity."""
+    """"Test", "TEst 2 – hubspot", "Testinnlegg": a post someone published to try the site, not company activity. Since 1.7.0
+    also gambling or pharmacy spam, WordPress's default welcome post and page titles listed like posts."""
     toks = tokens(title)
+    if SPAM_POST.search(" ".join(toks)) or " ".join(toks) in STUB_POSTS:
+        return True
     return bool(toks) and toks[0] in {"test", "testing", "testinnlegg", "testpost", "testartikkel", "testside"}         and (len(toks) <= 2 or any(t.isdigit() for t in toks[1:3]))
+
+
+ENGLISH_WORDS = set("the a an our we you your with for of and to in on this is are how why what new just all".split())
+
+
+def theme_demo_posts(posts: list[dict[str, Any]], site: SiteResult, company: Company, today: str | None = None) -> bool:
+    """Dated posts that are a theme's demo import, not the company's news: all of them English, none naming the company,
+    its brand or its domain, and either repeating a title ("Watch all courses for just $1.000.000/month" twice) or, on a
+    Norwegian site, all published within two weeks or none in the last two years ("Our New Office Downtown", "An
+    Interview With Our Lead Designer", 2018-2020, on a Norwegian children's-book publisher's site)."""
+    if len(posts) < 2:
+        return False
+    titles = [str(p.get("title") or "") for p in posts]
+    own = set(company.core) | {t for b in company.brands for t in name_tokens(b)} | set(tokens(registrable(host_of(site.home_url)).split(".")[0]))
+    for title in titles:
+        words = set(tokens(title))
+        if words & own or words & NORWEGIAN_WORDS or not words & ENGLISH_WORDS:
+            return False
+    if len(set(titles)) < len(titles):
+        return True
+    if not looks_norwegian(" ".join(p.text for _, p in site.pages)):
+        return False
+    dates = sorted(str(p.get("date") or "") for p in posts if p.get("date"))
+    if not dates:
+        return False
+    today = today or _today()
+    burst = (datetime.fromisoformat(dates[-1]) - datetime.fromisoformat(dates[0])).days <= 14
+    stale = (datetime.fromisoformat(today) - datetime.fromisoformat(dates[-1])).days > 730
+    return burst or stale
 
 
 def placeholder_post(title: str) -> bool:

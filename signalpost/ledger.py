@@ -272,6 +272,19 @@ class Ledger:
         self.rejected.append({"field": field_name, "value": value if isinstance(value, (str, int, float)) else str(value)[:200],
                               "reason": reason})
 
+    def drop(self, claim_ids: set[str], reason: str) -> None:
+        """Withdraw accepted claims (and evidence no other claim cites), recording why in ``rejected``."""
+        kept = []
+        for claim in self.claims:
+            if claim["id"] in claim_ids:
+                self._reject(claim["field"], claim["value"], reason)
+            else:
+                kept.append(claim)
+        self.claims = kept
+        cited = {ev for claim in kept for ev in claim.get("evidence_ids", [])}
+        for ev_id in [e for e in self.evidence if e not in cited]:
+            del self.evidence[ev_id]
+
     def by_field(self, field_name: str) -> list[dict[str, Any]]:
         return [c for c in self.claims if c["field"] == field_name]
 

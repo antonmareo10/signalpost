@@ -26,7 +26,7 @@ from .search import SearchProvider
 from .synth import build_summary
 from .ledger import supports
 from .web import (FREEMAIL, LOW_ACTIVITY, Candidate, Company, SiteResearcher, SiteResult, article_posts, candidate_slugs, career_postings,
-                  domain_match, extract_site, feed_posts,
+                  domain_match, extract_site, feed_posts, theme_demo_posts,
                   handle_matches, host_of, jsonld_posts, name_tokens, news_items, news_page_url, normalize_site_url, phone_digits,
                   registrable, wordpress_posts)
 
@@ -364,6 +364,9 @@ class Agent:
                         # 1.7.0: read the newest articles the news page (or home page) links, and date them from the article
                         work.posts = article_posts(self.sites._fetch_page, ledger, verified, self.today, extra_pages,
                                                    not_before=founded)
+                if work.posts and theme_demo_posts(work.posts, verified, company, self.today):
+                    ledger.drop({p["claim_id"] for p in work.posts}, "a theme's demo posts, not the company's activity")
+                    work.posts = []
                 if work.site.get("careers") and self.remaining() > 30:
                     # 1.7.0: the open positions the company's own careers page lists (or the applicant-tracking page it links)
                     work.site["postings"] = career_postings(self.sites._fetch_page, ledger, company, verified, work.site["careers"],

@@ -24,7 +24,7 @@ from signalpost.html import parse_html  # noqa: E402
 from signalpost.ledger import Ledger  # noqa: E402
 from signalpost.synth import build_summary  # noqa: E402
 from signalpost.web import (Candidate, Company, SiteResearcher, SiteResult, article_posts, career_postings, extract_site,  # noqa: E402
-                            legal_name_hit)
+                            legal_name_hit, test_post, theme_demo_posts)
 from test_v4 import FakeFetcher, result, site  # noqa: E402
 from test_v7 import hjemmeside  # noqa: E402
 
@@ -185,6 +185,29 @@ class ArticlePostTests(unittest.TestCase):
                               [(result("https://njordaqua.no/aktuelt/", b"", "text/html"), news)])
         self.assertEqual([(p["date"], p["title"]) for p in posts], [("2026-04-27", "Vi stiller ut på HavExpo 2026 i Bergen")])
         self.assertEqual(ledger.by_field("website_post")[0]["url"], "https://njordaqua.no/aktuelt/havexpo-2026-i-bergen")
+
+
+class PostQualityTests(unittest.TestCase):
+    def test_spam_and_page_stubs_are_not_posts(self):
+        for title in ("Online Kasino Platit Pomocí Paypal 2026", "Nove Automaty Hry Zdarma 2026", "Best Way To Play Craps",
+                      "Velkommen til redigeringsverktøyet Gutenberg", "Om oss"):
+            self.assertTrue(test_post(title), title)
+        for title in ("Skytale har fått ny nettside", "Trykkregulering fra Bronkhorst", "Hytte 9"):
+            self.assertFalse(test_post(title), title)
+
+    def test_a_theme_s_demo_posts_are_not_the_company_s_news(self):
+        s = site("https://mynteforlag.no/", "<html><body><p>Tvillingsirklene er en magisk og spennende fortelling om Timian og "
+                                           "Nellie som blir revet bort fra vår verden, og kastet inn i en kamp.</p></body></html>")
+        company = Company(org="911887290", name="MYNTE AS")
+        demo = [{"title": "Our New Office Downtown", "date": "2020-02-07"}, {"title": "An Interview With Our Lead Designer",
+                                                                             "date": "2020-02-06"},
+                {"title": "The Power Of One", "date": "2018-03-20"}]
+        self.assertTrue(theme_demo_posts(demo, s, company, "2026-11-13"))
+        news = [{"title": "Why a Generic EHS System Is Not Enough", "date": "2026-06-10"},
+                {"title": "How to Manage Safety Data Sheet Updates", "date": "2026-04-28"}]
+        self.assertFalse(theme_demo_posts(news, s, company, "2026-11-13"))  # recent, spread out: a real English blog
+        own = [{"title": "Mynte at the book fair", "date": "2020-02-07"}, {"title": "Our new office", "date": "2020-02-06"}]
+        self.assertFalse(theme_demo_posts(own, s, company, "2026-11-13"))  # names the company
 
 
 if __name__ == "__main__":
