@@ -205,7 +205,11 @@ industry code, contact details, roles).
    of these gives a dated item, up to three articles the news page (or home page) links are read and dated from their
    own JSON-LD `datePublished` or the only date within three lines of the headline. Posts dated before the
    company was founded, lorem-ipsum excerpts, WordPress's install-time sample post and the theme demo posts dated up to two
-   months after it are skipped, and `utm_*` parameters are removed from post links; plus dated register
+   months after it are skipped, and `utm_*` parameters are removed from post links. Since 1.7.0 also gambling or
+   pharmacy spam injected into a hacked site ("Online Kasino Platit Pomocí Paypal 2026"), WordPress's default welcome
+   post and page titles listed like posts ("Om oss", "Kontakt"); and when every post is English, names neither the
+   company, its brand nor its domain, and either repeats a title or (on a Norwegian site) came in one two-week burst or
+   is more than two years old, the posts are a theme's demo import and are withdrawn. Plus dated register
    events: role changes, and Enhetsregisteret's update log filtered to this organisation number (only entries that state
    which fields changed; the last 24 months).
 7. **Filed-accounts documents** – Regnskapsregisteret's list of annual-account copies for this organisation number; each

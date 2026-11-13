@@ -1,7 +1,103 @@
-# Evaluation (local, 21 Oct – 2 Nov 2026)
+# Evaluation (local, 21 Oct – 13 Nov 2026)
 
 Builderr's official score pools verified findings from every entrant and its own crawlers, so it cannot be reproduced
 locally. These are the measurements we can make, all with the committed code and **no API keys** unless stated.
+
+## Version 1.7.0 (13 Nov): an inferred website must prove itself, and posts must be the company's news
+
+**How it was found.** Builderr's review of 13 November (1.6.1, 5e6302c, on a 500-company set) checked 43 claims and
+found 10 about a different company, for example ISABELLA CAFE AS (Hønefoss) given https://www.isabellacafe.com/, a café
+in Tinley Park, Illinois, and WATAHA BYGG AS given https://wataha.no, a Polish association's site. Both were domains
+guessed from the name that passed the weakest route of the gate: the name on a site whose domain matches it, no other
+registered entity carrying that name, and a "Norwegian context" that four digits equal to the postcode, the city name
+or the word "Norway" anywhere on the page could satisfy. Rerun on 13 November, isabellacafe.com still had the name in
+its title and header, a matching domain and a name unique in the register; only the context check happened to fail.
+
+Then 1.6.1 was run on 1,000 companies never used before (the public universe, seed 20261113, sampled the starter kit's
+way after removing the 4,596 companies of every earlier batch and sample; 0 overlap with each): 169 websites. Of the
+13 that the stricter gate below no longer publishes or replaces, four are not the company's at all, all from the
+removed route:
+sportpartnerservice.no and surveyservice.no are domene.no parking pages; stortorvets-gjestgiveri.no (STORTORVETS
+GJESTGIVERI AS, a Kristiansand restaurant) is now a content farm about tennis tie-breaks, published with its 9 "posts"
+and 5 profiles; and fagmenn.no is a consumer portal, not FAGMENN AS of Moss, whose own site is fagmenn.as (published
+by 1.7.0 instead, on its full legal name), published with 10 posts. Reading every post then found 27 that are no
+company's activity: 10 casino-spam posts injected into a tiler's hacked WordPress ("Online Kasino Platit Pomocí
+Paypal 2026"), 8 English theme-demo posts on a Norwegian children's-book publisher's site ("Our New Office Downtown",
+2018-2020), 4 duplicated demo posts of a course theme ("Watch all courses for just $1.000.000/month") and 5 WordPress
+stubs ("Velkommen til redigeringsverktøyet Gutenberg", "Om oss", "Kontakt"). In all, 58 of the 1,145 external claims
+(website, profiles, careers pages, job ads, posts, brand, description, e-mail, identity proofs) 1.6.1 published for
+this batch, 5.1 %, were another organisation's or not the company's activity.
+
+**The fixes.**
+- A website we *inferred* (the domain of the registered e-mail address, a NAV ad's homepage, a domain guessed from the
+  name, a search result) is published only when the site itself ties it to the company: its organisation number; the
+  legal name in the site's identity text (title, header, footer, site name, JSON-LD organisation) with a registered
+  phone, e-mail or street address; or the full legal name with its legal form written as one ("Isabella Cafe AS", not
+  the English "as" of "Isabella Cafe as a family restaurant") on a `.no` or Norwegian-language site named after the
+  company. The name-uniqueness route is gone, a matching domain no longer stands in for a contact detail on the
+  e-mail domain's site, and "Norwegian context" is the `.no` domain or Norwegian text only. The register check on
+  whose website it is (1.5.0) still follows.
+- A website the company lists in the register is not published when its pages show neither the name nor a registered
+  contact detail (a lapsed domain may be someone else's now), nor when it is a domene.no parking page; the domain of
+  the registered e-mail address is no longer published from the register listing when its site refuses the crawler.
+- Posts: gambling or pharmacy spam, WordPress's default welcome post and page titles are skipped; when every post is
+  English, names neither the company, its brand nor its domain, and the titles repeat or (on a Norwegian site) all came
+  in one two-week burst or none is less than two years old, the posts are a theme's demo import and are withdrawn
+  (`rejected_claims` says why). A recent English blog that is spread out (intersolia.com) keeps its posts.
+- New facts from the verified, non-shared site: its phone number (a `tel:` link in the header or footer, or the
+  registered number on the contact page; never a number a link names after a role holder); the open positions its own
+  careers page lists (JSON-LD JobPosting naming the company, single adverts on an applicant-tracking account or job path
+  named after the company, never from a group's site); and, when no feed or teaser gives a dated item, up to three
+  articles its news page links, dated from their JSON-LD or the date beside the headline. "&" is also tried as "og" in
+  guessed domains (ruthogragna.no).
+
+**What it costs and what it finds.** 1.6.1 (5e6302c) and 1.7.0 (8762ba0) back to back on the same 1,000 companies on
+13 November, keyless, defaults, fresh caches, each from its own clean worktree: both 1,000 / 1,000 envelopes and
+validation passed; 793 s and 8,621 requests for 1.6.1, 797 s and 8,637 for 1.7.0. Companies / facts:
+
+| Family | 1.6.1 | 1.7.0 |
+|---|---|---|
+| Verified website | 169 / 169 | 158 / 158 |
+| Company-owned social profiles | 93 / 168 | 85 / 154 |
+| Careers page | 19 / 21 | 18 / 20 |
+| NAV job ads (exact organisation number) | 3 / 3 | 3 / 3 |
+| Open positions listed on the own careers page | – | 0 / 0 |
+| Dated posts from the own site | 37 / 269 | 32 / 216 |
+| Public brand | 89 | 83 |
+| Site description | 97 | 93 |
+| Site e-mail address | 67 / 69 | 65 / 67 |
+| Site phone number | – | 51 / 57 |
+| Roles, workplaces, accounts, register history | unchanged | unchanged |
+
+The 11 fewer websites are the 12 the gate no longer accepts, less one found by "&" → "og" (ruthogragna.no); fagmenn.no
+is replaced by fagmenn.as. Of the 12, three are someone else's (the two parking pages and the content farm) and nine
+are probably the company's but show neither the number nor a registered contact detail on the pages read
+(skypass.no, bbsbygg.no, heltraa.no, phonelab.no, bergenbackline.no, juridex.no, cctekstil.no, brooklyndiner.no) or
+refuse the crawler (ocdahl.no, the domain of O.C. DAHL AS's registered e-mail address): the price of not guessing.
+Posts: 61 fewer (20 on the two wrong sites, 27 junk, 14 on the probably-correct sites no longer published) and 8 more
+in 4 companies from dated articles (solbjor.no, lmi-as.no, amento.no, frognerhudklinikk.no). None of the 18 careers pages in this batch lists an advert the agent can read without a browser
+(most say "send an open application"), so the new careers-page postings are covered by unit tests only. The 1.6.1 run
+repeated in the evening gave the same counts as in the morning for every external family; the annual-account copy
+lists depend on the endpoint's budget on the day (928 companies in the morning, 675 and 676 in the evening runs).
+
+**Precision, read by hand (1.7.0).** Every website (158: 75 print the organisation number, the rest show the legal
+name with a registered contact detail, are the website the company lists in the register, or print the full legal name;
+10 are labelled as a page on someone else's site), every post (216 in 32 companies), every phone number (57), the 20
+careers pages and 3 NAV ads, and a random sample of 30 profiles, 20 brands, 15 descriptions and 15 e-mail addresses:
+534 claims, none about another organisation and none spam or demo content. Three websites are a group's site that the
+company itself lists in the register (eccera.com/no/ for ECCERA PARTNER NETWORK AS, seaway7.com for SEAWAY 7 HEAVY
+TRANSPORT AS, nora.no for NORA HAUGESUND AS) and about 15 posts are pages a feed lists like posts (Vennesund Camping's
+cabins, an FAQ, Eccera's staff pages); they are counted as correct. The independent evidence audit
+(`eval/audit_evidence.py`) re-finds 94,288 / 94,288 excerpts of this run in their stored snapshots (plus 3 NAV ads,
+checked against their stored projection by design).
+
+Smoke test (`samples/smoke-100.jsonl`, three passes with the release code, 13 Nov, committed in `docs/smoke/`): 100/100
+envelopes, validation passed on every pass, 104–108 s per pass, third pass 0 changes and 0 carried-forward claims,
+evidence audit 9,405 / 9,405 excerpts re-found, 100/100 summaries with an overview, 1,462 / 1,462 sentences that cite
+claims carry their sources. Same websites, profiles, posts and careers page as 1.6.1's smoke test, plus one site phone
+number. The scripted browser check (24 steps, 1440 px and 390 px) passes on the committed smoke viewer and axe-core 4.14
+reports 0 violations on all 10 views. 191 offline unit tests (178 in 1.6.1). The default time budget stays 40 minutes
+from process start.
 
 ## Version 1.6.1 (2 Nov): a sister's or parent's site lends only the page
 

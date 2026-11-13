@@ -1,9 +1,9 @@
 {
-  "run_id": "run-20261102T011059Z",
-  "agent_version": "1.6.1",
-  "started_at": "2026-11-02T01:10:59Z",
-  "completed_at": "2026-11-02T01:13:01Z",
-  "wall_clock_seconds": 122.7,
+  "run_id": "run-20261113T202951Z",
+  "agent_version": "1.7.0",
+  "started_at": "2026-11-13T20:29:51Z",
+  "completed_at": "2026-11-13T20:31:35Z",
+  "wall_clock_seconds": 104.3,
   "inputs": 100,
   "emitted_envelopes": 100,
   "status_counts": {
@@ -21,9 +21,8 @@
     },
     "website": {
       "available": 9,
-      "not_available": 88,
+      "not_available": 89,
       "ambiguous": 1,
-      "blocked": 1,
       "failed": 1
     },
     "hiring": {
@@ -83,17 +82,22 @@
     "leadership": {
       "companies": 100,
       "company_share": 1.0,
-      "claims": 383
+      "claims": 384
     },
     "register_history": {
       "companies": 100,
       "company_share": 1.0,
-      "claims": 496
+      "claims": 503
     },
     "website": {
       "companies": 9,
       "company_share": 0.09,
       "claims": 9
+    },
+    "website_contact": {
+      "companies": 2,
+      "company_share": 0.02,
+      "claims": 3
     },
     "workplaces": {
       "companies": 74,
@@ -102,19 +106,19 @@
     }
   },
   "operations": {
-    "requests": 1029,
-    "bytes": 110474486,
-    "p50_request_ms": 421,
-    "p95_request_ms": 2141,
-    "p50_company_ms": 6890,
-    "p95_company_ms": 14827,
+    "requests": 1034,
+    "bytes": 117026693,
+    "p50_request_ms": 391,
+    "p95_request_ms": 1781,
+    "p50_company_ms": 6014,
+    "p95_company_ms": 10562,
     "third_party_cost_usd": 0.0,
     "search_provider": null,
     "search_calls": 0,
     "nav_feed": {
       "state": "available",
-      "pages": 190,
-      "active_ads": 8310,
+      "pages": 198,
+      "active_ads": 10004,
       "matched_companies": 0,
       "error": null
     },
@@ -124,14 +128,14 @@
       "paced_wait_cap_seconds": 300.0
     },
     "top_hosts": {
-      "data.brreg.no": 623,
-      "pam-stilling-feed.nav.no": 191,
+      "data.brreg.no": 621,
+      "pam-stilling-feed.nav.no": 199,
       "www.aelektronikk.no": 6,
+      "www.wyssenavalanche.com": 6,
       "7-eleven.no": 6,
       "devoldsregnskap.no": 6,
       "stronen.no": 5,
-      "svorka.no": 5,
-      "atg.no": 5
+      "svorka.no": 5
     }
   },
   "validation": {
@@ -145,6 +149,6 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "previous_envelopes": "run-20261102T010858Z.jsonl",
+  "previous_envelopes": "run-20261113T202804Z.jsonl",
   "viewer": "site/index.html"
 }
